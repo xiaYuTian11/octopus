@@ -7,9 +7,11 @@ import {
     DollarSign,
     Clock,
     Activity,
-    TrendingUp
+    TrendingUp,
+    Globe,
+    Key
 } from 'lucide-react';
-import { useUpdateChannel, useDeleteChannel, type Channel } from '@/api/endpoints/channel';
+import { useUpdateChannel, useDeleteChannel, type Channel, type UpdateChannelRequest } from '@/api/endpoints/channel';
 import {
     MorphingDialogTitle,
     MorphingDialogDescription,
@@ -21,6 +23,9 @@ import { type StatsMetricsFormatted } from '@/api/endpoints/stats';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { ChannelForm, type ChannelFormData } from './Form';
+import { formatMoney } from '@/lib/utils';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 export function CardContent({ channel, stats }: { channel: Channel; stats: StatsMetricsFormatted }) {
     const { setIsOpen } = useMorphingDialog();
@@ -32,8 +37,20 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
         name: channel.name,
         type: channel.type,
         enabled: channel.enabled,
-        base_url: channel.base_url,
-        key: channel.key,
+        base_urls: channel.base_urls?.length ? channel.base_urls : [{ url: '', delay: 0 }],
+        custom_header: channel.custom_header ?? [],
+        channel_proxy: channel.channel_proxy ?? '',
+        param_override: channel.param_override ?? '',
+        keys: channel.keys.length > 0
+            ? channel.keys.map((k) => ({
+                id: k.id,
+                enabled: k.enabled,
+                channel_key: k.channel_key,
+                status_code: k.status_code,
+                last_use_time_stamp: k.last_use_time_stamp,
+                total_cost: k.total_cost,
+            }))
+            : [{ enabled: true, channel_key: '' }],
         model: channel.model,
         custom_model: channel.custom_model,
         proxy: channel.proxy,
@@ -44,9 +61,76 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
 
     const currentView = isEditing ? 'editing' : 'viewing';
 
+    const baseUrlsEqual = (a: Channel['base_urls'] | undefined, b: Channel['base_urls'] | undefined) =>
+        JSON.stringify(a ?? []) === JSON.stringify(b ?? []);
+    const headersEqual = (a: Channel['custom_header'] | undefined, b: Channel['custom_header'] | undefined) =>
+        JSON.stringify(a ?? []) === JSON.stringify(b ?? []);
+
     const handleUpdate = (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
-        updateChannel.mutate({ id: channel.id, ...formData }, {
+        const req: UpdateChannelRequest = { id: channel.id };
+
+        // only send changed fields to avoid accidental clears
+        if (formData.name !== channel.name) req.name = formData.name;
+        if (formData.type !== channel.type) req.type = formData.type;
+        if (formData.enabled !== channel.enabled) req.enabled = formData.enabled;
+        if (!baseUrlsEqual(formData.base_urls, channel.base_urls)) {
+            req.base_urls = (formData.base_urls ?? []).filter((u) => u.url.trim()).map((u) => ({
+                url: u.url.trim(),
+                delay: Number(u.delay || 0),
+            }));
+        }
+        if (formData.model !== channel.model) req.model = formData.model;
+        if (formData.custom_model !== channel.custom_model) req.custom_model = formData.custom_model;
+        if (formData.proxy !== channel.proxy) req.proxy = formData.proxy;
+        if (formData.auto_sync !== channel.auto_sync) req.auto_sync = formData.auto_sync;
+        if (formData.auto_group !== channel.auto_group) req.auto_group = formData.auto_group;
+
+        if (!headersEqual(formData.custom_header, channel.custom_header)) {
+            req.custom_header = (formData.custom_header ?? [])
+                .map((h) => ({ header_key: h.header_key.trim(), header_value: h.header_value }))
+                .filter((h) => h.header_key && h.header_value !== '');
+        }
+
+        const nextChannelProxy = formData.channel_proxy.trim();
+        const curChannelProxy = channel.channel_proxy ?? '';
+        if (nextChannelProxy !== curChannelProxy) {
+            req.channel_proxy = nextChannelProxy ? nextChannelProxy : null;
+        }
+
+        const nextParamOverride = formData.param_override.trim();
+        const curParamOverride = channel.param_override ?? '';
+        if (nextParamOverride !== curParamOverride) {
+            req.param_override = nextParamOverride ? nextParamOverride : null;
+        }
+
+        const originalKeys = channel.keys;
+        const originalByID = new Map(originalKeys.map((k) => [k.id, k]));
+        const nextKeys = formData.keys ?? [];
+
+        const nextIDs = new Set(nextKeys.filter((k) => typeof k.id === 'number').map((k) => k.id as number));
+        const keys_to_delete = originalKeys.filter((k) => !nextIDs.has(k.id)).map((k) => k.id);
+
+        const keys_to_add = nextKeys
+            .filter((k) => !k.id && k.channel_key.trim())
+            .map((k) => ({ enabled: k.enabled, channel_key: k.channel_key }));
+
+        const keys_to_update = nextKeys
+            .filter((k) => typeof k.id === 'number' && originalByID.has(k.id as number))
+            .map((k) => {
+                const orig = originalByID.get(k.id as number)!;
+                const u: { id: number; enabled?: boolean; channel_key?: string } = { id: k.id as number };
+                if (k.enabled !== orig.enabled) u.enabled = k.enabled;
+                if (k.channel_key !== orig.channel_key) u.channel_key = k.channel_key;
+                return Object.keys(u).length > 1 ? u : null;
+            })
+            .filter((u) => u !== null) as Array<{ id: number; enabled?: boolean; channel_key?: string }>;
+
+        if (keys_to_add.length > 0) req.keys_to_add = keys_to_add;
+        if (keys_to_update.length > 0) req.keys_to_update = keys_to_update;
+        if (keys_to_delete.length > 0) req.keys_to_delete = keys_to_delete;
+
+        updateChannel.mutate(req, {
             onSuccess: () => {
                 setIsEditing(false);
                 setIsOpen(false);
@@ -90,7 +174,7 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                         <TabsContent value="viewing" >
                             <div className="max-h-[60vh] overflow-y-auto space-y-4 sm:space-y-5">
                                 <dl className="grid gap-3 grid-cols-1 sm:grid-cols-3">
-                                    <div className="rounded-2xl border bg-gradient-to-br from-chart-1/10 to-chart-1/5 p-3 sm:p-4">
+                                    <div className="rounded-2xl border bg-linear-to-br from-chart-1/10 to-chart-1/5 p-3 sm:p-4">
                                         <dt className="flex items-center gap-2 mb-2 text-xs font-medium text-muted-foreground">
                                             <Activity className="size-4 text-chart-1" />
                                             {t('metrics.totalRequests')}
@@ -101,7 +185,7 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                                         </dd>
                                     </div>
 
-                                    <div className="rounded-2xl border bg-gradient-to-br from-chart-3/10 to-chart-3/5 p-3 sm:p-4">
+                                    <div className="rounded-2xl border bg-linear-to-br from-chart-3/10 to-chart-3/5 p-3 sm:p-4">
                                         <dt className="flex items-center gap-2 mb-2 text-xs font-medium text-muted-foreground">
                                             <FileText className="size-4 text-chart-3" />
                                             {t('metrics.totalToken')}
@@ -112,7 +196,7 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                                         </dd>
                                     </div>
 
-                                    <div className="rounded-2xl border bg-gradient-to-br from-chart-5/10 to-chart-5/5 p-3 sm:p-4">
+                                    <div className="rounded-2xl border bg-linear-to-br from-chart-5/10 to-chart-5/5 p-3 sm:p-4">
                                         <dt className="flex items-center gap-2 mb-2 text-xs font-medium text-muted-foreground">
                                             <DollarSign className="size-4 text-chart-5" />
                                             {t('metrics.totalCost')}
@@ -215,6 +299,95 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                                             </dd>
                                         </div>
                                     </dl>
+                                </section>
+
+                                {/* Base URLs */}
+                                <section className="space-y-3">
+                                    <h4 className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                        <Globe className="size-3.5" />
+                                        {t('sections.baseUrls')}
+                                    </h4>
+                                    <div className="rounded-2xl border bg-card overflow-hidden">
+                                        {channel.base_urls?.map((url, i) => (
+                                            <div key={i} className="flex items-center justify-between p-3 sm:p-4 border-b last:border-0 hover:bg-accent/5 transition-colors">
+                                                <div className="flex flex-col gap-1 min-w-0">
+                                                    <span className="font-mono text-sm truncate select-all">{url.url}</span>
+                                                </div>
+                                                <Badge
+                                                    variant="secondary"
+                                                    className={cn(
+                                                        "h-5 px-1.5 text-xs",
+                                                        url.delay < 300
+                                                            ? "bg-green-500/15 text-green-700 dark:text-green-400"
+                                                            : url.delay < 1000
+                                                                ? "bg-orange-500/15 text-orange-700 dark:text-orange-400"
+                                                                : "bg-red-500/15 text-red-700 dark:text-red-400"
+                                                    )}
+                                                >
+                                                    {url.delay}ms
+                                                </Badge>
+                                            </div>
+                                        ))}
+                                        {(!channel.base_urls || channel.base_urls.length === 0) && (
+                                            <div className="p-4 text-sm text-muted-foreground text-center">{t('noBaseUrls')}</div>
+                                        )}
+                                    </div>
+                                </section>
+
+                                {/* Keys */}
+                                <section className="space-y-3">
+                                    <h4 className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                                        <Key className="size-3.5" />
+                                        {t('sections.keys')}
+                                    </h4>
+                                    <div className="rounded-2xl border bg-card overflow-hidden">
+                                        {channel.keys?.map((key) => (
+                                            <div key={key.id} className="flex items-center gap-3 p-3 sm:p-4 border-b last:border-0 hover:bg-accent/5 transition-colors">
+                                                <div className={cn("size-2 shrink-0 rounded-full", key.enabled ? "bg-emerald-500" : "bg-destructive")} />
+
+                                                <span className="font-mono text-sm truncate min-w-0 flex-1">
+                                                    {key.channel_key.length > 10
+                                                        ? `${key.channel_key.slice(0, 4)}...${key.channel_key.slice(-4)}`
+                                                        : key.channel_key}
+                                                </span>
+
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    {key.last_use_time_stamp > 0 && (
+                                                        <span className="text-xs text-muted-foreground whitespace-nowrap hidden sm:inline-block">
+                                                            {new Date(key.last_use_time_stamp * 1000).toLocaleString()}
+                                                        </span>
+                                                    )}
+
+                                                    {key.status_code !== 0 && (
+                                                        <Badge
+                                                            variant="secondary"
+                                                            className={cn(
+                                                                "h-5 px-1.5 text-[10px]",
+                                                                key.status_code === 200
+                                                                    ? "bg-green-500/15 text-green-700 dark:text-green-400"
+                                                                    : key.status_code === 401 ||
+                                                                        key.status_code === 403 ||
+                                                                        key.status_code === 429 ||
+                                                                        key.status_code >= 500
+                                                                        ? "bg-red-500/15 text-red-700 dark:text-red-400"
+                                                                        : "bg-orange-500/15 text-orange-700 dark:text-orange-400"
+                                                            )}
+                                                        >
+                                                            {key.status_code}
+                                                        </Badge>
+                                                    )}
+
+                                                    <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
+                                                        {formatMoney(key.total_cost).formatted.value}
+                                                        {formatMoney(key.total_cost).formatted.unit}
+                                                    </Badge>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {(!channel.keys || channel.keys.length === 0) && (
+                                            <div className="p-4 text-sm text-muted-foreground text-center">{t('noKeys')}</div>
+                                        )}
+                                    </div>
                                 </section>
 
                                 {/* 等待时间 */}

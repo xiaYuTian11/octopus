@@ -1,16 +1,18 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 
-	"github.com/bestruirui/octopus/internal/client"
+	"github.com/bestruirui/octopus/internal/helper"
 	"github.com/bestruirui/octopus/internal/model"
 	"github.com/bestruirui/octopus/internal/op"
 	"github.com/bestruirui/octopus/internal/server/middleware"
 	"github.com/bestruirui/octopus/internal/server/resp"
 	"github.com/bestruirui/octopus/internal/server/router"
-	"github.com/bestruirui/octopus/internal/server/worker"
 	"github.com/bestruirui/octopus/internal/task"
 	"github.com/gin-gonic/gin"
 )
@@ -80,25 +82,40 @@ func createChannel(c *gin.Context) {
 	}
 	stats := op.StatsChannelGet(channel.ID)
 	channel.Stats = &stats
-	worker.CheckAndAddLLMPrice(channel.Model, channel.CustomModel)
-	worker.AutoGroup(channel.ID, channel.Name, channel.Model, channel.CustomModel, channel.AutoGroup)
+	go func(channel *model.Channel) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		modelStr := channel.Model + "," + channel.CustomModel
+		modelArray := strings.Split(modelStr, ",")
+		helper.LLMPriceAddToDB(modelArray, ctx)
+		helper.ChannelBaseUrlDelayUpdate(channel, ctx)
+		helper.ChannelAutoGroup(channel, ctx)
+	}(&channel)
 	resp.Success(c, channel)
 }
 
 func updateChannel(c *gin.Context) {
-	var channel model.Channel
-	if err := c.ShouldBindJSON(&channel); err != nil {
+	var req model.ChannelUpdateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
 		resp.Error(c, http.StatusBadRequest, resp.ErrInvalidJSON)
 		return
 	}
-	if err := op.ChannelUpdate(&channel, c.Request.Context()); err != nil {
+	channel, err := op.ChannelUpdate(&req, c.Request.Context())
+	if err != nil {
 		resp.Error(c, http.StatusInternalServerError, err.Error())
 		return
 	}
 	stats := op.StatsChannelGet(channel.ID)
 	channel.Stats = &stats
-	worker.CheckAndAddLLMPrice(channel.Model, channel.CustomModel)
-	worker.AutoGroup(channel.ID, channel.Name, channel.Model, channel.CustomModel, channel.AutoGroup)
+	go func(channel *model.Channel) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer cancel()
+		modelStr := channel.Model + "," + channel.CustomModel
+		modelArray := strings.Split(modelStr, ",")
+		helper.LLMPriceAddToDB(modelArray, ctx)
+		helper.ChannelBaseUrlDelayUpdate(channel, ctx)
+		helper.ChannelAutoGroup(channel, ctx)
+	}(channel)
 	resp.Success(c, channel)
 }
 
@@ -137,7 +154,7 @@ func fetchModel(c *gin.Context) {
 		resp.Error(c, http.StatusBadRequest, resp.ErrInvalidJSON)
 		return
 	}
-	models, err := client.FetchLLMName(c.Request.Context(), request)
+	models, err := helper.FetchModels(c.Request.Context(), request)
 	if err != nil {
 		resp.Error(c, http.StatusInternalServerError, err.Error())
 		return
@@ -146,11 +163,11 @@ func fetchModel(c *gin.Context) {
 }
 
 func syncChannel(c *gin.Context) {
-	task.SyncLLMTask()
+	task.SyncModelsTask()
 	resp.Success(c, nil)
 }
 
 func getLastSyncTime(c *gin.Context) {
-	time := task.GetLastSyncTime()
+	time := task.GetLastSyncModelsTime()
 	resp.Success(c, time)
 }

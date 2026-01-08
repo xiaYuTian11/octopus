@@ -18,8 +18,8 @@ export function CreateDialogContent() {
     const t = useTranslations('group');
 
     return (
-        <div className="w-screen max-w-full md:max-w-4xl">
-            <MorphingDialogTitle>
+        <div className="w-screen max-w-full md:max-w-4xl h-[calc(100vh-2rem)] min-h-0 flex flex-col">
+            <MorphingDialogTitle className="shrink-0">
                 <header className="mb-5 flex items-center justify-between">
                     <h2 className="text-2xl font-bold text-card-foreground">
                         {t('create.title')}
@@ -34,12 +34,12 @@ export function CreateDialogContent() {
                     />
                 </header>
             </MorphingDialogTitle>
-            <MorphingDialogDescription>
+            <MorphingDialogDescription className="flex-1 min-h-0 overflow-hidden">
                 <GroupEditor
                     submitText={t('create.submit')}
                     submittingText={t('create.submitting')}
                     isSubmitting={createGroup.isPending}
-                    onSubmit={({ name, match_regex, mode, members }) => {
+                    onSubmit={({ name, match_regex, mode, first_token_time_out, members }) => {
                         const items: GroupItem[] = members.map((member, index) => ({
                             channel_id: member.channel_id,
                             model_name: member.name,
@@ -48,7 +48,7 @@ export function CreateDialogContent() {
                         }));
 
                         createGroup.mutate(
-                            { name, mode, match_regex: match_regex ?? '', items },
+                            { name, mode, match_regex: match_regex ?? '', first_token_time_out: first_token_time_out ?? 0, items },
                             {
                                 onSuccess: () => setIsOpen(false),
                                 onError: (error) => toast.error(t('toast.createFailed'), { description: error.message }),

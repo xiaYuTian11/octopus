@@ -37,22 +37,23 @@ function EditDialogContent({ group, displayMembers, isSubmitting, onSubmit }: Ed
     const { setIsOpen } = useMorphingDialog();
     const t = useTranslations('group');
     return (
-        <div className="w-screen max-w-full md:max-w-4xl">
-            <MorphingDialogTitle>
-                <header className="mb-5 flex items-center justify-between">
+        <>
+            <MorphingDialogTitle className="shrink-0">
+                <header className="mb-3 flex items-center justify-between">
                     <h2 className="text-2xl font-bold text-card-foreground">
                         {t('detail.actions.edit')}
                     </h2>
                     <MorphingDialogClose className="relative right-0 top-0" />
                 </header>
             </MorphingDialogTitle>
-            <MorphingDialogDescription>
+            <MorphingDialogDescription className="flex-1 min-h-0 overflow-hidden">
                 <GroupEditor
                     key={`edit-group-${group.id}`}
                     initial={{
                         name: group.name,
                         match_regex: group.match_regex ?? '',
                         mode: group.mode,
+                        first_token_time_out: group.first_token_time_out ?? 0,
                         members: displayMembers,
                     }}
                     submitText={t('detail.actions.save')}
@@ -62,7 +63,7 @@ function EditDialogContent({ group, displayMembers, isSubmitting, onSubmit }: Ed
                     onSubmit={(v) => onSubmit(v, () => setIsOpen(false))}
                 />
             </MorphingDialogDescription>
-        </div>
+        </>
     );
 }
 
@@ -79,6 +80,13 @@ export function GroupCard({ group }: { group: Group }) {
     const membersRef = useRef<SelectedMember[]>([]);
 
     const channelNameByKey = useMemo(() => buildChannelNameByModelKey(modelChannels), [modelChannels]);
+    const enabledByKey = useMemo(() => {
+        const map = new Map<string, boolean>();
+        modelChannels.forEach((mc) => {
+            map.set(modelChannelKey(mc.channel_id, mc.name), mc.enabled);
+        });
+        return map;
+    }, [modelChannels]);
 
     const displayMembers = useMemo((): SelectedMember[] =>
         [...(group.items || [])]
@@ -86,12 +94,13 @@ export function GroupCard({ group }: { group: Group }) {
             .map((item) => ({
                 id: modelChannelKey(item.channel_id, item.model_name),
                 name: item.model_name,
+                enabled: enabledByKey.get(modelChannelKey(item.channel_id, item.model_name)) ?? true,
                 channel_id: item.channel_id,
                 channel_name: channelNameByKey.get(modelChannelKey(item.channel_id, item.model_name)) ?? `Channel ${item.channel_id}`,
                 item_id: item.id,
                 weight: item.weight,
             })),
-        [group.items, channelNameByKey]
+        [group.items, channelNameByKey, enabledByKey]
     );
 
     useEffect(() => {
@@ -204,10 +213,12 @@ export function GroupCard({ group }: { group: Group }) {
         const payload: GroupUpdateRequest = { id: group.id };
         const nextName = values.name.trim();
         const nextRegex = (values.match_regex ?? '').trim();
+        const nextFirstTokenTimeOut = values.first_token_time_out ?? 0;
 
         if (nextName && nextName !== group.name) payload.name = nextName;
         if (values.mode !== group.mode) payload.mode = values.mode;
         if (nextRegex !== (group.match_regex ?? '')) payload.match_regex = nextRegex;
+        if (nextFirstTokenTimeOut !== (group.first_token_time_out ?? 0)) payload.first_token_time_out = nextFirstTokenTimeOut;
         if (items_to_add.length) payload.items_to_add = items_to_add;
         if (items_to_update.length) payload.items_to_update = items_to_update;
         if (items_to_delete.length) payload.items_to_delete = items_to_delete;
@@ -224,7 +235,7 @@ export function GroupCard({ group }: { group: Group }) {
             },
             onError,
         });
-    }, [group.id, group.items, group.match_regex, group.mode, group.name, onSuccess, onError, updateGroup]);
+    }, [group.first_token_time_out, group.id, group.items, group.match_regex, group.mode, group.name, onSuccess, onError, updateGroup]);
 
     return (
         <article className="flex flex-col rounded-3xl border border-border bg-card text-card-foreground p-4 custom-shadow">
@@ -250,7 +261,7 @@ export function GroupCard({ group }: { group: Group }) {
                         </MorphingDialogTrigger>
 
                         <MorphingDialogContainer>
-                            <MorphingDialogContent className="w-fit max-w-full bg-card text-card-foreground px-6 py-4 rounded-3xl custom-shadow max-h-[90vh] overflow-y-auto">
+                            <MorphingDialogContent className="relative w-screen max-w-full md:max-w-4xl bg-card text-card-foreground px-6 py-4 rounded-3xl custom-shadow h-[calc(100vh-2rem)] flex flex-col overflow-hidden">
                                 <EditDialogContent
                                     group={group}
                                     displayMembers={displayMembers}
@@ -323,7 +334,7 @@ export function GroupCard({ group }: { group: Group }) {
                 ))}
             </div>
 
-            <section className="rounded-xl border border-border/50 bg-muted/30 overflow-hidden relative">
+            <section className="rounded-xl border border-border/50 bg-muted/30 overflow-hidden relative h-101">
                 <MemberList
                     members={members}
                     onReorder={setMembers}

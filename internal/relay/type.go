@@ -46,4 +46,10 @@ type relayContext struct {
 	internalRequest *model.InternalLLMRequest
 	channel         *dbmodel.Channel
 	metrics         *RelayMetrics
+
+	usedKey dbmodel.ChannelKey
+
+	// firstTokenTimeOutSec: streaming-only "time to first token" timeout for the selected group/channel.
+	// When >0 and stream doesn't produce any transformed output within this duration, we abort and retry next channel.
+	firstTokenTimeOutSec int
 }
