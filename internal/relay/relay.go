@@ -352,6 +352,13 @@ func (rc *relayContext) transformStreamData(ctx context.Context, data string) ([
 		return nil, nil
 	}
 
+	log.Infof("[DEBUG-TOKEN] transformStreamData: calling inAdapter(%p).TransformStream, has usage: %v",
+		rc.inAdapter, internalStream.Usage != nil)
+	if internalStream.Usage != nil {
+		log.Infof("[DEBUG-TOKEN] transformStreamData: usage in stream - prompt=%d, completion=%d",
+			internalStream.Usage.PromptTokens, internalStream.Usage.CompletionTokens)
+	}
+
 	// 内部格式 → 入站格式
 	inStream, err := rc.inAdapter.TransformStream(ctx, internalStream)
 	if err != nil {
@@ -384,9 +391,27 @@ func (rc *relayContext) handleResponse(ctx context.Context, response *http.Respo
 
 // collectResponse 收集响应信息
 func (rc *relayContext) collectResponse() {
+	log.Infof("[DEBUG-TOKEN] collectResponse: calling GetInternalResponse on adapter %p", rc.inAdapter)
 	internalResponse, err := rc.inAdapter.GetInternalResponse(rc.c.Request.Context())
-	if err != nil || internalResponse == nil {
+	log.Infof("[DEBUG-TOKEN] collectResponse: response=%v, err=%v", internalResponse != nil, err)
+
+	if err != nil {
+		log.Warnf("[DEBUG-TOKEN] collectResponse: error getting internal response: %v", err)
 		return
+	}
+
+	if internalResponse == nil {
+		log.Warnf("[DEBUG-TOKEN] collectResponse: internal response is nil")
+		return
+	}
+
+	if internalResponse.Usage != nil {
+		log.Infof("[DEBUG-TOKEN] collectResponse: usage found - prompt=%d, completion=%d, total=%d",
+			internalResponse.Usage.PromptTokens,
+			internalResponse.Usage.CompletionTokens,
+			internalResponse.Usage.TotalTokens)
+	} else {
+		log.Warnf("[DEBUG-TOKEN] collectResponse: usage is nil in response")
 	}
 
 	// 设置响应内容

@@ -9,6 +9,7 @@ import (
 	"github.com/samber/lo"
 
 	"github.com/bestruirui/octopus/internal/transformer/model"
+	"github.com/bestruirui/octopus/internal/utils/log"
 	"github.com/bestruirui/octopus/internal/utils/xurl"
 )
 
@@ -91,6 +92,7 @@ func (i *ResponseInbound) TransformStream(ctx context.Context, stream *model.Int
 
 	// Store the chunk for aggregation
 	i.streamChunks = append(i.streamChunks, stream)
+	log.Infof("[DEBUG-TOKEN] ResponseInbound(%p).TransformStream: stored chunk, total chunks: %d, has usage: %v", i, len(i.streamChunks), stream.Usage != nil)
 
 	var events [][]byte
 
@@ -580,13 +582,25 @@ func (i *ResponseInbound) closeCurrentOutputItem() [][]byte {
 // For streaming: aggregates all stored stream chunks into a complete response
 // For non-streaming: returns the stored response
 func (i *ResponseInbound) GetInternalResponse(ctx context.Context) (*model.InternalLLMResponse, error) {
+	log.Infof("[DEBUG-TOKEN] ResponseInbound(%p).GetInternalResponse: storedResponse=%v, streamChunks=%d",
+		i, i.storedResponse != nil, len(i.streamChunks))
+
 	// Return stored response for non-stream scenario
 	if i.storedResponse != nil {
+		if i.storedResponse.Usage != nil {
+			log.Infof("[DEBUG-TOKEN] Non-stream usage: prompt=%d, completion=%d, total=%d",
+				i.storedResponse.Usage.PromptTokens,
+				i.storedResponse.Usage.CompletionTokens,
+				i.storedResponse.Usage.TotalTokens)
+		} else {
+			log.Warnf("[DEBUG-TOKEN] Non-stream response has nil Usage")
+		}
 		return i.storedResponse, nil
 	}
 
 	// Aggregate stream chunks for stream scenario
 	if len(i.streamChunks) == 0 {
+		log.Warnf("[DEBUG-TOKEN] No stream chunks available for aggregation")
 		return nil, nil
 	}
 

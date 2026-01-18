@@ -12,6 +12,7 @@ import (
 	"github.com/bestruirui/octopus/internal/price"
 	transformerModel "github.com/bestruirui/octopus/internal/transformer/model"
 	"github.com/bestruirui/octopus/internal/utils/log"
+	"github.com/bestruirui/octopus/internal/utils/tokenizer"
 )
 
 // RelayMetrics 统一管理请求的日志记录和统计信息
@@ -68,12 +69,28 @@ func (m *RelayMetrics) SetInternalResponse(resp *transformerModel.InternalLLMRes
 
 	// 从响应中提取 Usage 并计算费用
 	if resp == nil || resp.Usage == nil {
+		log.Warnf("[TOKEN-FIX] Response or Usage is nil, cannot calculate tokens")
 		return
 	}
 
 	usage := resp.Usage
 	m.Stats.InputToken = usage.PromptTokens
 	m.Stats.OutputToken = usage.CompletionTokens
+
+	// 🔧 修复：当 completion_tokens 为 0 但响应中有内容时，估算 token 数量
+	if usage.CompletionTokens == 0 && m.hasResponseContent(resp) {
+		estimatedTokens := m.estimateCompletionTokens(resp)
+		if estimatedTokens > 0 {
+			log.Warnf("[TOKEN-FIX] API returned completion_tokens=0 but response has content. Estimated tokens: %d", estimatedTokens)
+			usage.CompletionTokens = estimatedTokens
+			m.Stats.OutputToken = estimatedTokens
+			// 更新响应中的 usage 信息，确保日志记录正确
+			resp.Usage.CompletionTokens = estimatedTokens
+			if usage.TotalTokens > 0 {
+				resp.Usage.TotalTokens = usage.PromptTokens + estimatedTokens
+			}
+		}
+	}
 
 	// 计算费用
 	modelPrice := price.GetLLMPrice(m.ActualModel)
@@ -93,6 +110,93 @@ func (m *RelayMetrics) SetInternalResponse(resp *transformerModel.InternalLLMRes
 		m.Stats.InputCost = (float64(usage.PromptTokensDetails.CachedTokens)*modelPrice.CacheRead + float64(usage.PromptTokens-usage.PromptTokensDetails.CachedTokens)*modelPrice.Input) * 1e-6
 	}
 	m.Stats.OutputCost = float64(usage.CompletionTokens) * modelPrice.Output * 1e-6
+}
+
+// hasResponseContent 检查响应中是否有实际内容
+func (m *RelayMetrics) hasResponseContent(resp *transformerModel.InternalLLMResponse) bool {
+	if resp == nil || len(resp.Choices) == 0 {
+		return false
+	}
+
+	for _, choice := range resp.Choices {
+		// 检查是否有消息内容
+		if choice.Message != nil {
+			// 检查文本内容
+			if choice.Message.Content.Content != nil && *choice.Message.Content.Content != "" {
+				return true
+			}
+			// 检查多部分内容
+			if len(choice.Message.Content.MultipleContent) > 0 {
+				return true
+			}
+			// 检查 tool calls
+			if len(choice.Message.ToolCalls) > 0 {
+				return true
+			}
+			// 检查推理内容
+			if choice.Message.ReasoningContent != nil && *choice.Message.ReasoningContent != "" {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+// estimateCompletionTokens 估算响应的 token 数量
+func (m *RelayMetrics) estimateCompletionTokens(resp *transformerModel.InternalLLMResponse) int64 {
+	if resp == nil || len(resp.Choices) == 0 {
+		return 0
+	}
+
+	var totalContent strings.Builder
+
+	for _, choice := range resp.Choices {
+		if choice.Message == nil {
+			continue
+		}
+
+		// 收集文本内容
+		if choice.Message.Content.Content != nil {
+			totalContent.WriteString(*choice.Message.Content.Content)
+		}
+
+		// 收集多部分内容
+		for _, part := range choice.Message.Content.MultipleContent {
+			if part.Type == "text" && part.Text != nil {
+				totalContent.WriteString(*part.Text)
+			}
+		}
+
+		// 收集 tool calls 内容
+		for _, tc := range choice.Message.ToolCalls {
+			// Tool call 格式化为 JSON 以更准确地估算 tokens
+			totalContent.WriteString(fmt.Sprintf(`{"name":"%s","arguments":%s}`, tc.Function.Name, tc.Function.Arguments))
+		}
+
+		// 收集推理内容
+		if choice.Message.ReasoningContent != nil {
+			totalContent.WriteString(*choice.Message.ReasoningContent)
+		}
+	}
+
+	content := totalContent.String()
+	if content == "" {
+		return 0
+	}
+
+	// 使用项目中的 tokenizer 进行更精确的估算
+	estimatedTokens := tokenizer.CountTokens(content, m.ActualModel)
+
+	// 如果 tokenizer 返回 0（可能是错误），使用简单估算作为回退
+	if estimatedTokens == 0 {
+		estimatedTokens = len(content) / 4 // 粗略估算：平均每个 token 约 4 个字符
+		log.Warnf("[TOKEN-FIX] Tokenizer returned 0, using fallback estimation")
+	}
+
+	log.Infof("[TOKEN-FIX] Content length: %d chars, estimated tokens: %d (using tokenizer)", len(content), estimatedTokens)
+
+	return int64(estimatedTokens)
 }
 
 // Save 保存日志和统计信息
