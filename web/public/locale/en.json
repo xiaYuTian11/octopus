@@ -8,7 +8,14 @@
         "close": "Close",
         "retry": "Retry",
         "batchTest": "Batch Test",
-        "testGroup": "Test Group"
+        "testGroup": "Test Group",
+        "selectModels": "Select Models",
+        "searchModels": "Search models...",
+        "selectedCount": "Selected {count} / {total}",
+        "selectAll": "Select All",
+        "deselectAll": "Deselect All",
+        "noModelsFound": "No models found",
+        "confirmTest": "Test ({count})"
     },
     "login": {
         "username": "Username",

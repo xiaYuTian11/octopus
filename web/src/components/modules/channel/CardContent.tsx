@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import {
     Trash2,
     CheckCircle2,
@@ -13,6 +13,7 @@ import {
     FlaskConical
 } from 'lucide-react';
 import { BatchTestDialog, type TestTarget } from '@/components/common/BatchTestDialog';
+import { ModelSelectionDialog, type ModelOption } from '@/components/common/ModelSelectionDialog';
 import { useUpdateChannel, useDeleteChannel, type Channel, type UpdateChannelRequest } from '@/api/endpoints/channel';
 import {
     MorphingDialogTitle,
@@ -36,6 +37,8 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
     const [isEditing, setIsEditing] = useState(false);
     const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
     const [isTestDialogOpen, setIsTestDialogOpen] = useState(false);
+    const [isModelSelectionOpen, setIsModelSelectionOpen] = useState(false);
+    const [selectedModelsForTest, setSelectedModelsForTest] = useState<string[]>([]);
     const tTest = useTranslations('test');
     const [formData, setFormData] = useState<ChannelFormData>({
         name: channel.name,
@@ -154,7 +157,7 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
         }, 300);
     };
 
-    const getTestTargets = (): TestTarget[] => {
+    const getAllModels = useCallback((): string[] => {
         const models: string[] = [];
         if (channel.model) {
             models.push(...channel.model.split(',').map(m => m.trim()).filter(Boolean));
@@ -162,12 +165,42 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
         if (channel.custom_model) {
             models.push(...channel.custom_model.split(',').map(m => m.trim()).filter(Boolean));
         }
-        return models.map(model => ({
+        return models;
+    }, [channel.model, channel.custom_model]);
+
+    const getModelOptions = useMemo((): ModelOption[] => {
+        return getAllModels().map(model => ({
+            model,
+            channelId: channel.id,
+            channelName: channel.name,
+        }));
+    }, [getAllModels, channel.id, channel.name]);
+
+    const getTestTargets = useCallback((models?: string[]): TestTarget[] => {
+        const targetModels = models || getAllModels();
+        return targetModels.map(model => ({
             channelId: channel.id,
             channelName: channel.name,
             model,
         }));
-    };
+    }, [getAllModels, channel.id, channel.name]);
+
+    const handleOpenModelSelection = useCallback(() => {
+        setIsModelSelectionOpen(true);
+    }, []);
+
+    const handleConfirmModelSelection = useCallback((models: string[]) => {
+        setSelectedModelsForTest(models);
+        setIsTestDialogOpen(true);
+    }, []);
+
+    const handleTestDialogClose = useCallback((open: boolean) => {
+        setIsTestDialogOpen(open);
+        if (!open) {
+            // 测试对话框关闭时重置选择
+            setSelectedModelsForTest([]);
+        }
+    }, []);
 
     return (
         <>
@@ -425,10 +458,10 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                             {/* 操作按钮 */}
                             <div className="grid gap-3 sm:grid-cols-3 pt-2">
                                 <Button
-                                    onClick={() => setIsTestDialogOpen(true)}
+                                    onClick={handleOpenModelSelection}
                                     variant="outline"
                                     className="w-full rounded-2xl h-12"
-                                    disabled={getTestTargets().length === 0}
+                                    disabled={getAllModels().length === 0}
                                 >
                                     <FlaskConical className="size-4 mr-2" />
                                     {tTest('batchTest')}
@@ -473,10 +506,19 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                 </Tabs>
             </MorphingDialogDescription>
 
+            <ModelSelectionDialog
+                open={isModelSelectionOpen}
+                onOpenChange={setIsModelSelectionOpen}
+                models={getModelOptions()}
+                initialSelected={selectedModelsForTest}
+                onConfirm={handleConfirmModelSelection}
+                title={`${tTest('selectModels')}: ${channel.name}`}
+            />
+
             <BatchTestDialog
                 open={isTestDialogOpen}
-                onOpenChange={setIsTestDialogOpen}
-                targets={getTestTargets()}
+                onOpenChange={handleTestDialogClose}
+                targets={getTestTargets(selectedModelsForTest.length > 0 ? selectedModelsForTest : undefined)}
             />
         </>
     );

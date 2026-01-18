@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import {
@@ -136,34 +136,47 @@ export function BatchTestDialog({ open, onOpenChange, targets, title }: BatchTes
         };
     }, [open, targets, runTests]);
 
-    const handleClose = () => {
+    const handleClose = useCallback(() => {
         abortControllerRef.current?.abort();
         setIsTesting(false);
         onOpenChange(false);
-    };
+    }, [onOpenChange]);
 
-    const completedCount = Array.from(results.values()).filter(
-        r => r.status === 'success' || r.status === 'error'
-    ).length;
-    const successCount = Array.from(results.values()).filter(r => r.status === 'success').length;
-    const errorCount = Array.from(results.values()).filter(r => r.status === 'error').length;
-    const progress = targets.length > 0 ? (completedCount / targets.length) * 100 : 0;
+    const completedCount = useMemo(() =>
+        Array.from(results.values()).filter(r => r.status === 'success' || r.status === 'error').length,
+        [results]
+    );
+
+    const successCount = useMemo(() =>
+        Array.from(results.values()).filter(r => r.status === 'success').length,
+        [results]
+    );
+
+    const errorCount = useMemo(() =>
+        Array.from(results.values()).filter(r => r.status === 'error').length,
+        [results]
+    );
+
+    const progress = useMemo(() =>
+        targets.length > 0 ? (completedCount / targets.length) * 100 : 0,
+        [targets.length, completedCount]
+    );
 
     return (
         <Dialog open={open} onOpenChange={handleClose}>
-            <DialogContent className="sm:max-w-lg">
+            <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
                 <DialogHeader>
                     <DialogTitle>{title || t('title')}</DialogTitle>
                 </DialogHeader>
 
-                <div className="space-y-4">
+                <div className="space-y-4 flex-1 min-h-0 flex flex-col">
                     <div className="flex items-center justify-between text-sm text-muted-foreground">
                         <span>{t('progress')}</span>
                         <span>{completedCount} / {targets.length}</span>
                     </div>
                     <Progress value={progress} className="h-2" />
 
-                    <div className="max-h-[300px] overflow-y-auto space-y-2 pr-1">
+                    <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-1">
                         {targets.map(({ channelId, channelName, model }) => {
                             const key = getKey(channelId, model);
                             const result = results.get(key);
@@ -173,7 +186,8 @@ export function BatchTestDialog({ open, onOpenChange, targets, title }: BatchTes
                                 <div
                                     key={key}
                                     className={cn(
-                                        'flex items-center justify-between p-3 rounded-xl border transition-colors',
+                                        'flex items-center justify-between p-3 rounded-xl border transition-all',
+                                        'min-h-[64px] sm:min-h-0',
                                         status === 'success' && 'border-green-500/30 bg-green-500/5',
                                         status === 'error' && 'border-red-500/30 bg-red-500/5',
                                         (status === 'pending' || status === 'testing') && 'border-border bg-muted/30'
@@ -181,16 +195,16 @@ export function BatchTestDialog({ open, onOpenChange, targets, title }: BatchTes
                                 >
                                     <div className="flex items-center gap-3 min-w-0">
                                         {status === 'pending' && (
-                                            <div className="size-5 rounded-full border-2 border-muted-foreground/30" />
+                                            <div className="size-5 rounded-full border-2 border-muted-foreground/30 shrink-0" />
                                         )}
                                         {status === 'testing' && (
-                                            <Loader2 className="size-5 text-primary animate-spin" />
+                                            <Loader2 className="size-5 text-primary animate-spin shrink-0" />
                                         )}
                                         {status === 'success' && (
-                                            <CheckCircle2 className="size-5 text-green-500" />
+                                            <CheckCircle2 className="size-5 text-green-500 shrink-0" />
                                         )}
                                         {status === 'error' && (
-                                            <XCircle className="size-5 text-red-500" />
+                                            <XCircle className="size-5 text-red-500 shrink-0" />
                                         )}
                                         <div className="min-w-0">
                                             <div className="text-sm font-medium truncate">{channelName}</div>
@@ -231,12 +245,21 @@ export function BatchTestDialog({ open, onOpenChange, targets, title }: BatchTes
                     )}
                 </div>
 
-                <DialogFooter>
-                    <Button variant="outline" onClick={handleClose}>
+                <DialogFooter className="gap-2 sm:gap-0">
+                    <Button
+                        variant="outline"
+                        onClick={handleClose}
+                        className="min-h-[44px] sm:min-h-10"
+                    >
                         {isTesting ? t('cancel') : t('close')}
                     </Button>
                     {!isTesting && completedCount === targets.length && (
-                        <Button onClick={runTests}>{t('retry')}</Button>
+                        <Button
+                            onClick={runTests}
+                            className="min-h-[44px] sm:min-h-10"
+                        >
+                            {t('retry')}
+                        </Button>
                     )}
                 </DialogFooter>
             </DialogContent>

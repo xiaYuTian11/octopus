@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import {
     MorphingDialogClose,
     MorphingDialogTitle,
@@ -9,27 +9,29 @@ import { useCreateChannel, ChannelType, AutoGroupType } from '@/api/endpoints/ch
 import { useTranslations } from 'next-intl';
 import { ChannelForm, type ChannelFormData } from './Form';
 
+const initialFormData: ChannelFormData = {
+    name: '',
+    type: ChannelType.OpenAIChat,
+    base_urls: [{ url: '', delay: 0 }],
+    custom_header: [],
+    channel_proxy: '',
+    param_override: '',
+    keys: [{ enabled: true, channel_key: '' }],
+    model: '',
+    custom_model: '',
+    auto_sync: false,
+    auto_group: AutoGroupType.None,
+    enabled: true,
+    proxy: false,
+};
+
 export function CreateDialogContent() {
     const { setIsOpen } = useMorphingDialog();
     const createChannel = useCreateChannel();
-    const [formData, setFormData] = useState<ChannelFormData>({
-        name: '',
-        type: ChannelType.OpenAIChat,
-        base_urls: [{ url: '', delay: 0 }],
-        custom_header: [],
-        channel_proxy: '',
-        param_override: '',
-        keys: [{ enabled: true, channel_key: '' }],
-        model: '',
-        custom_model: '',
-        auto_sync: false,
-        auto_group: AutoGroupType.None,
-        enabled: true,
-        proxy: false,
-    });
+    const [formData, setFormData] = useState<ChannelFormData>(initialFormData);
     const t = useTranslations('channel.create');
 
-    const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    const handleSubmit = useCallback((event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
         const normalizedBaseUrls = (formData.base_urls ?? []).filter((u) => u.url.trim()).map((u) => ({
             url: u.url.trim(),
@@ -62,25 +64,11 @@ export function CreateDialogContent() {
             },
             {
                 onSuccess: () => {
-                    setFormData({
-                        name: '',
-                        type: ChannelType.OpenAIChat,
-                        base_urls: [{ url: '', delay: 0 }],
-                        custom_header: [],
-                        channel_proxy: '',
-                        param_override: '',
-                        keys: [{ enabled: true, channel_key: '' }],
-                        model: '',
-                        custom_model: '',
-                        auto_sync: false,
-                        auto_group: AutoGroupType.None,
-                        enabled: true,
-                        proxy: false,
-                    });
+                    setFormData(initialFormData);
                     setIsOpen(false);
                 }
             });
-    };
+    }, [formData, createChannel, setIsOpen]);
 
     return (
         <div className="w-screen max-w-full md:max-w-xl h-full min-h-0 flex flex-col">

@@ -8,7 +8,14 @@
         "close": "关闭",
         "retry": "重试",
         "batchTest": "批量测试",
-        "testGroup": "测试分组"
+        "testGroup": "测试分组",
+        "selectModels": "选择模型",
+        "searchModels": "搜索模型...",
+        "selectedCount": "已选择 {count} / {total}",
+        "selectAll": "全选",
+        "deselectAll": "取消全选",
+        "noModelsFound": "未找到模型",
+        "confirmTest": "测试 ({count})"
     },
     "login": {
         "username": "用户名",
