@@ -42,14 +42,26 @@ async function handleResponse<T>(response: Response): Promise<T> {
     }
 
     if (!response.ok) {
-        const error: ApiError = {
+        // 提取错误消息
+        let errorMessage: string;
+        if (data && typeof data === 'object' && 'message' in data && typeof data.message === 'string') {
+            errorMessage = data.message;
+        } else if (typeof data === 'string') {
+            errorMessage = data;
+        } else {
+            errorMessage = response.statusText;
+        }
+
+        const apiError: ApiError = {
             code: response.status,
-            message: (data && typeof data === 'object' && 'message' in data && typeof data.message === 'string')
-                ? data.message
-                : (typeof data === 'string' ? data : response.statusText),
+            message: errorMessage,
         };
 
-        handleError(error);
+        handleError(apiError);
+        
+        // 抛出一个真正的 Error 对象，这样 error.message 可以正常工作
+        const error = new Error(errorMessage);
+        (error as Error & { code: number }).code = response.status;
         throw error;
     }
 

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Plus, Search, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Search, X, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
     MorphingDialog,
@@ -9,13 +9,17 @@ import {
     MorphingDialogContainer,
     MorphingDialogContent,
 } from '@/components/ui/morphing-dialog';
-import { buttonVariants } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { useNavStore, type NavItem } from '@/components/modules/navbar';
 import { CreateDialogContent as ChannelCreateContent } from '@/components/modules/channel/Create';
 import { CreateDialogContent as GroupCreateContent } from '@/components/modules/group/Create';
 import { CreateDialogContent as ModelCreateContent } from '@/components/modules/model/Create';
 import { useSearchStore } from './search-store';
 import { usePaginationStore } from './pagination-store';
+import { useChannelList, useSyncChannel } from '@/api/endpoints/channel';
+import { toast } from '@/components/common/Toast';
+import { useTranslations } from 'next-intl';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/animate-ui/components/animate/tooltip';
 
 const TOOLBAR_PAGES: NavItem[] = ['channel', 'group', 'model'];
 
@@ -42,6 +46,11 @@ export function Toolbar() {
     const nextPage = usePaginationStore((s) => s.nextPage);
     const setPage = usePaginationStore((s) => s.setPage);
     const [searchExpanded, setSearchExpanded] = useState(false);
+    
+    // 批量同步相关
+    const { data: channelsData } = useChannelList();
+    const syncChannel = useSyncChannel();
+    const t = useTranslations('channel.batchSync');
 
     useEffect(() => {
         queueMicrotask(() => {
@@ -52,6 +61,30 @@ export function Toolbar() {
     }, [activeItem, setSearchTerm, setPage]);
 
     const showToolbar = TOOLBAR_PAGES.includes(activeItem);
+    
+    // 批量同步处理
+    const handleBatchSync = () => {
+        // 检查是否有启用自动同步的渠道
+        const autoSyncChannels = channelsData?.filter(c => c.raw.auto_sync) || [];
+        
+        if (autoSyncChannels.length === 0) {
+            toast.error(t('noAutoSyncChannels'));
+            return;
+        }
+
+        syncChannel.mutate(undefined, {
+            onSuccess: () => {
+                toast.success(t('success'));
+            },
+            onError: (error) => {
+                const errorMessage = error instanceof Error ? error.message :
+                    (typeof error === 'object' && error !== null && 'message' in error)
+                        ? String((error as { message: unknown }).message)
+                        : t('failed');
+                toast.error(errorMessage);
+            },
+        });
+    };
 
     return (
         <AnimatePresence mode="wait">
@@ -131,6 +164,26 @@ export function Toolbar() {
                             <ChevronRight className="size-4" />
                         </button>
                     </div>
+
+                    {/* 批量同步按钮 - 仅在渠道页面显示 */}
+                    {activeItem === 'channel' && (
+                        <Tooltip side="bottom" sideOffset={10} align="center">
+                            <TooltipTrigger asChild>
+                                <Button
+                                    onClick={handleBatchSync}
+                                    disabled={syncChannel.isPending}
+                                    variant="ghost"
+                                    size="icon"
+                                    className="rounded-xl transition-none hover:bg-transparent text-muted-foreground hover:text-foreground"
+                                >
+                                    <RefreshCw className={`size-4 transition-colors duration-300 ${syncChannel.isPending ? 'animate-spin' : ''}`} />
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                {syncChannel.isPending ? t('syncing') : t('button')}
+                            </TooltipContent>
+                        </Tooltip>
+                    )}
 
                     {/* 创建按钮 */}
                     <MorphingDialog>

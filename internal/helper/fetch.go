@@ -3,6 +3,8 @@ package helper
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
@@ -25,6 +27,57 @@ func FetchModels(ctx context.Context, request model.Channel) ([]string, error) {
 	}
 }
 
+// parseJSONResponse 解析 JSON 响应，如果响应不是有效的 JSON，返回更友好的错误信息
+func parseJSONResponse(resp *http.Response, result interface{}) error {
+	// 先读取响应体
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	// 检查 HTTP 状态码
+	if resp.StatusCode != http.StatusOK {
+		// 尝试解析错误响应
+		var errResp struct {
+			Error struct {
+				Message string `json:"message"`
+				Type    string `json:"type"`
+			} `json:"error"`
+			Message string `json:"message"`
+		}
+		if json.Unmarshal(body, &errResp) == nil {
+			if errResp.Error.Message != "" {
+				return fmt.Errorf("API error (HTTP %d): %s", resp.StatusCode, errResp.Error.Message)
+			}
+			if errResp.Message != "" {
+				return fmt.Errorf("API error (HTTP %d): %s", resp.StatusCode, errResp.Message)
+			}
+		}
+		// 如果无法解析错误响应，返回原始响应体的前 200 个字符
+		bodyStr := string(body)
+		if len(bodyStr) > 200 {
+			bodyStr = bodyStr[:200] + "..."
+		}
+		return fmt.Errorf("API error (HTTP %d): %s", resp.StatusCode, bodyStr)
+	}
+
+	// 尝试解析 JSON
+	if err := json.Unmarshal(body, result); err != nil {
+		// 如果解析失败，检查是否是 HTML 响应
+		bodyStr := string(body)
+		if strings.HasPrefix(strings.TrimSpace(bodyStr), "<") {
+			return fmt.Errorf("received HTML response instead of JSON, the API endpoint may be incorrect or unavailable")
+		}
+		// 返回更详细的错误信息
+		if len(bodyStr) > 200 {
+			bodyStr = bodyStr[:200] + "..."
+		}
+		return fmt.Errorf("failed to parse JSON response: %w, body: %s", err, bodyStr)
+	}
+
+	return nil
+}
+
 // refer: https://platform.openai.com/docs/api-reference/models/list
 func fetchOpenAIModels(client *http.Client, ctx context.Context, request model.Channel) ([]string, error) {
 	req, _ := http.NewRequestWithContext(
@@ -42,8 +95,7 @@ func fetchOpenAIModels(client *http.Client, ctx context.Context, request model.C
 	defer resp.Body.Close()
 
 	var result model.OpenAIModelList
-
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := parseJSONResponse(resp, &result); err != nil {
 		return nil, err
 	}
 
@@ -81,8 +133,7 @@ func fetchGeminiModels(client *http.Client, ctx context.Context, request model.C
 		defer resp.Body.Close()
 
 		var result model.GeminiModelList
-
-		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		if err := parseJSONResponse(resp, &result); err != nil {
 			return nil, err
 		}
 
@@ -133,8 +184,7 @@ func fetchAnthropicModels(client *http.Client, ctx context.Context, request mode
 		defer resp.Body.Close()
 
 		var result model.AnthropicModelList
-
-		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		if err := parseJSONResponse(resp, &result); err != nil {
 			return nil, err
 		}
 
