@@ -12,6 +12,20 @@ import (
 	"github.com/bestruirui/octopus/internal/transformer/outbound"
 )
 
+// 浏览器 Headers，用于绕过基本的 Cloudflare 检测
+const (
+	browserUserAgent  = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+	browserAccept     = "application/json, text/plain, */*"
+	browserAcceptLang = "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7"
+)
+
+// setBrowserHeaders 为请求设置浏览器 Headers，帮助绕过基本的 Cloudflare 检测
+func setBrowserHeaders(req *http.Request) {
+	req.Header.Set("User-Agent", browserUserAgent)
+	req.Header.Set("Accept", browserAccept)
+	req.Header.Set("Accept-Language", browserAcceptLang)
+}
+
 func FetchModels(ctx context.Context, request model.Channel) ([]string, error) {
 	client, err := ChannelHttpClient(&request)
 	if err != nil {
@@ -27,12 +41,40 @@ func FetchModels(ctx context.Context, request model.Channel) ([]string, error) {
 	}
 }
 
+// isCloudflareChallenge 检测响应是否为 Cloudflare 挑战页面
+func isCloudflareChallenge(body string) bool {
+	// Cloudflare 挑战页面的常见特征
+	cloudflareIndicators := []string{
+		"Just a moment",
+		"Cloudflare",
+		"cf-browser-verification",
+		"challenge-platform",
+		"_cf_chl",
+		"Checking your browser",
+		"DDoS protection by",
+	}
+
+	for _, indicator := range cloudflareIndicators {
+		if strings.Contains(body, indicator) {
+			return true
+		}
+	}
+	return false
+}
+
 // parseJSONResponse 解析 JSON 响应，如果响应不是有效的 JSON，返回更友好的错误信息
 func parseJSONResponse(resp *http.Response, result interface{}) error {
 	// 先读取响应体
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	bodyStr := string(body)
+
+	// 检查是否为 Cloudflare 挑战页面
+	if isCloudflareChallenge(bodyStr) {
+		return fmt.Errorf("API is protected by Cloudflare and cannot be accessed automatically. Please configure models manually / API 被 Cloudflare 保护，无法自动获取模型列表，请手动设置模型")
 	}
 
 	// 检查 HTTP 状态码
@@ -54,7 +96,6 @@ func parseJSONResponse(resp *http.Response, result interface{}) error {
 			}
 		}
 		// 如果无法解析错误响应，返回原始响应体的前 200 个字符
-		bodyStr := string(body)
 		if len(bodyStr) > 200 {
 			bodyStr = bodyStr[:200] + "..."
 		}
@@ -64,7 +105,6 @@ func parseJSONResponse(resp *http.Response, result interface{}) error {
 	// 尝试解析 JSON
 	if err := json.Unmarshal(body, result); err != nil {
 		// 如果解析失败，检查是否是 HTML 响应
-		bodyStr := string(body)
 		if strings.HasPrefix(strings.TrimSpace(bodyStr), "<") {
 			return fmt.Errorf("received HTML response instead of JSON, the API endpoint may be incorrect or unavailable")
 		}
@@ -86,6 +126,7 @@ func fetchOpenAIModels(client *http.Client, ctx context.Context, request model.C
 		request.GetBaseUrl()+"/models",
 		nil,
 	)
+	setBrowserHeaders(req)
 	req.Header.Set("Authorization", "Bearer "+request.GetChannelKey().ChannelKey)
 
 	resp, err := client.Do(req)
@@ -118,6 +159,7 @@ func fetchGeminiModels(client *http.Client, ctx context.Context, request model.C
 			request.GetBaseUrl()+"/models",
 			nil,
 		)
+		setBrowserHeaders(req)
 		req.Header.Set("X-Goog-Api-Key", request.GetChannelKey().ChannelKey)
 
 		if pageToken != "" {
@@ -166,6 +208,7 @@ func fetchAnthropicModels(client *http.Client, ctx context.Context, request mode
 			request.GetBaseUrl()+"/models",
 			nil,
 		)
+		setBrowserHeaders(req)
 		req.Header.Set("X-Api-Key", request.GetChannelKey().ChannelKey)
 		req.Header.Set("Anthropic-Version", "2023-06-01")
 
