@@ -377,7 +377,7 @@ export function GroupCard({ group }: { group: Group }) {
             <BatchTestDialog
                 open={isTestDialogOpen}
                 onOpenChange={setIsTestDialogOpen}
-                targets={getTestTargets()}
+                targets={isTestDialogOpen ? getTestTargets() : []}
                 title={`${tTest('testGroup')}: ${group.name}`}
             />
         </article >
