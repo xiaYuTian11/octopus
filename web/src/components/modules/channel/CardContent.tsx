@@ -509,7 +509,7 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
             <ModelSelectionDialog
                 open={isModelSelectionOpen}
                 onOpenChange={setIsModelSelectionOpen}
-                models={getModelOptions()}
+                models={getModelOptions}
                 initialSelected={selectedModelsForTest}
                 onConfirm={handleConfirmModelSelection}
                 title={`${tTest('selectModels')}: ${channel.name}`}
