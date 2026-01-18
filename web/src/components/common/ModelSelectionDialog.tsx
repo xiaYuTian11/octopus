@@ -56,7 +56,7 @@ export function ModelSelectionDialog({
 }: ModelSelectionDialogProps) {
     const t = useTranslations('test');
     const [searchQuery, setSearchQuery] = useState('');
-    const debouncedSearchQuery = useDebounce(searchQuery, 200);
+    const debouncedSearchQuery = useDebounce(searchQuery, 150);
     const [selectedModels, setSelectedModels] = useState<Set<string>>(() =>
         new Set(initialSelected && initialSelected.length > 0 ? initialSelected : models.map(m => m.model))
     );
@@ -76,9 +76,14 @@ export function ModelSelectionDialog({
 
     const filteredModels = useMemo(() => {
         if (!debouncedSearchQuery.trim()) return models;
-        const query = debouncedSearchQuery.toLowerCase();
+        const query = debouncedSearchQuery.toLowerCase().trim();
         return models.filter(m => m.model.toLowerCase().includes(query));
     }, [models, debouncedSearchQuery]);
+
+    // 计算当前过滤结果中有多少已被选中
+    const selectedFilteredCount = useMemo(() => {
+        return filteredModels.filter(m => selectedModels.has(m.model)).length;
+    }, [filteredModels, selectedModels]);
 
     const handleToggle = useCallback((model: string) => {
         setSelectedModels(prev => {
@@ -93,19 +98,30 @@ export function ModelSelectionDialog({
     }, []);
 
     const handleToggleAll = useCallback(() => {
-        if (selectedModels.size === filteredModels.length) {
-            setSelectedModels(new Set());
-        } else {
-            setSelectedModels(new Set(filteredModels.map(m => m.model)));
-        }
-    }, [selectedModels.size, filteredModels]);
+        // 判断当前过滤结果是否全部选中
+        const allFilteredSelected = filteredModels.length > 0 &&
+            selectedFilteredCount === filteredModels.length;
+        
+        setSelectedModels(prev => {
+            const next = new Set(prev);
+            if (allFilteredSelected) {
+                // 取消选中当前过滤结果中的所有项
+                filteredModels.forEach(m => next.delete(m.model));
+            } else {
+                // 选中当前过滤结果中的所有项
+                filteredModels.forEach(m => next.add(m.model));
+            }
+            return next;
+        });
+    }, [filteredModels, selectedFilteredCount]);
 
     const handleConfirm = useCallback(() => {
         onConfirm(Array.from(selectedModels));
         onOpenChange(false);
     }, [selectedModels, onConfirm, onOpenChange]);
 
-    const allSelected = filteredModels.length > 0 && selectedModels.size === filteredModels.length;
+    // 判断当前过滤结果是否全部选中
+    const allFilteredSelected = filteredModels.length > 0 && selectedFilteredCount === filteredModels.length;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
@@ -136,7 +152,7 @@ export function ModelSelectionDialog({
                             onClick={handleToggleAll}
                             className="flex items-center gap-1.5 text-primary hover:underline min-h-[44px] sm:min-h-0 px-2 -mx-2"
                         >
-                            {allSelected ? (
+                            {allFilteredSelected ? (
                                 <>
                                     <CheckSquare className="size-4" />
                                     {t('deselectAll')}
