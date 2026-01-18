@@ -521,7 +521,7 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
             <BatchTestDialog
                 open={isTestDialogOpen}
                 onOpenChange={handleTestDialogClose}
-                targets={getTestTargets(selectedModelsForTest.length > 0 ? selectedModelsForTest : undefined)}
+                targets={isTestDialogOpen ? getTestTargets(selectedModelsForTest.length > 0 ? selectedModelsForTest : undefined) : []}
             />
         </>
     );
