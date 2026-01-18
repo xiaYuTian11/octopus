@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { ChevronLeft, ChevronRight, Plus, Search, X, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -16,10 +16,12 @@ import { CreateDialogContent as GroupCreateContent } from '@/components/modules/
 import { CreateDialogContent as ModelCreateContent } from '@/components/modules/model/Create';
 import { useSearchStore } from './search-store';
 import { usePaginationStore } from './pagination-store';
-import { useChannelList, useSyncChannel } from '@/api/endpoints/channel';
+import { useChannelList, syncSingleChannel } from '@/api/endpoints/channel';
 import { toast } from '@/components/common/Toast';
 import { useTranslations } from 'next-intl';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/animate-ui/components/animate/tooltip';
+import { SyncProgressDialog, type SyncResult } from '@/components/modules/channel/SyncProgressDialog';
+import { useQueryClient } from '@tanstack/react-query';
 
 const TOOLBAR_PAGES: NavItem[] = ['channel', 'group', 'model'];
 
@@ -49,8 +51,14 @@ export function Toolbar() {
     
     // 批量同步相关
     const { data: channelsData } = useChannelList();
-    const syncChannel = useSyncChannel();
+    const queryClient = useQueryClient();
     const t = useTranslations('channel.batchSync');
+    
+    // 同步进度对话框状态
+    const [syncDialogOpen, setSyncDialogOpen] = useState(false);
+    const [syncResults, setSyncResults] = useState<SyncResult[]>([]);
+    const [isSyncCompleted, setIsSyncCompleted] = useState(false);
+    const [isSyncing, setIsSyncing] = useState(false);
 
     useEffect(() => {
         queueMicrotask(() => {
@@ -63,7 +71,7 @@ export function Toolbar() {
     const showToolbar = TOOLBAR_PAGES.includes(activeItem);
     
     // 批量同步处理
-    const handleBatchSync = () => {
+    const handleBatchSync = useCallback(async () => {
         // 检查是否有启用自动同步的渠道
         const autoSyncChannels = channelsData?.filter(c => c.raw.auto_sync) || [];
         
@@ -72,134 +80,187 @@ export function Toolbar() {
             return;
         }
 
-        syncChannel.mutate(undefined, {
-            onSuccess: () => {
-                toast.success(t('success'));
-            },
-            onError: (error) => {
+        // 初始化同步结果
+        const initialResults: SyncResult[] = autoSyncChannels.map(c => ({
+            channelId: c.raw.id,
+            channelName: c.raw.name,
+            status: 'pending' as const,
+        }));
+
+        setSyncResults(initialResults);
+        setIsSyncCompleted(false);
+        setIsSyncing(true);
+        setSyncDialogOpen(true);
+
+        // 逐个同步渠道
+        for (let i = 0; i < autoSyncChannels.length; i++) {
+            const channel = autoSyncChannels[i];
+            
+            // 更新当前渠道状态为同步中
+            setSyncResults(prev => prev.map((r, idx) => 
+                idx === i ? { ...r, status: 'syncing' as const } : r
+            ));
+
+            try {
+                await syncSingleChannel(channel.raw.id);
+                
+                // 更新为成功状态
+                setSyncResults(prev => prev.map((r, idx) => 
+                    idx === i ? { ...r, status: 'success' as const } : r
+                ));
+            } catch (error) {
+                // 更新为失败状态
                 const errorMessage = error instanceof Error ? error.message :
                     (typeof error === 'object' && error !== null && 'message' in error)
                         ? String((error as { message: unknown }).message)
                         : t('failed');
-                toast.error(errorMessage);
-            },
-        });
-    };
+                
+                setSyncResults(prev => prev.map((r, idx) => 
+                    idx === i ? { ...r, status: 'error' as const, error: errorMessage } : r
+                ));
+            }
+        }
+
+        // 同步完成
+        setIsSyncCompleted(true);
+        setIsSyncing(false);
+        
+        // 刷新渠道列表和同步时间
+        queryClient.invalidateQueries({ queryKey: ['channels', 'list'] });
+        queryClient.invalidateQueries({ queryKey: ['channels', 'last-sync-time'] });
+    }, [channelsData, t, queryClient]);
+
+    // 对话框关闭时的处理
+    const handleDialogOpenChange = useCallback((open: boolean) => {
+        if (!open && !isSyncing) {
+            setSyncDialogOpen(false);
+        }
+    }, [isSyncing]);
 
     return (
-        <AnimatePresence mode="wait">
-            {showToolbar && (
-                <motion.div
-                    key="toolbar"
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9 }}
-                    transition={{ duration: 0.2 }}
-                    className="flex items-center gap-2"
-                >
-                    {/* 搜索按钮/展开框 */}
-                    <div className="relative h-9 w-9">
-                        {!searchExpanded ? (
-                            <motion.button
-                                layoutId="search-box"
-                                onClick={() => setSearchExpanded(true)}
-                                className={buttonVariants({ variant: "ghost", size: "icon", className: "absolute inset-0 rounded-xl transition-none hover:bg-transparent text-muted-foreground hover:text-foreground" })}
-                            >
-                                <motion.span layout="position"><Search className="size-4 transition-colors duration-300" /></motion.span>
-                            </motion.button>
-                        ) : (
-                            <motion.div
-                                layoutId="search-box"
-                                className="absolute right-0 top-0 flex items-center gap-2 h-9 px-3 rounded-xl border"
-                                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                            >
-                                <motion.span layout="position"><Search className="size-4 text-muted-foreground shrink-0" /></motion.span>
-                                <input
-                                    type="text"
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(activeItem, e.target.value)}
-                                    autoFocus
-                                    className="w-20 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-                                />
-                                <button
-                                    onClick={() => {
-                                        setSearchTerm(activeItem, '');
-                                        setSearchExpanded(false);
-                                    }}
-                                    className="p-0.5 rounded shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+        <>
+            <AnimatePresence mode="wait">
+                {showToolbar && (
+                    <motion.div
+                        key="toolbar"
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                        transition={{ duration: 0.2 }}
+                        className="flex items-center gap-2"
+                    >
+                        {/* 搜索按钮/展开框 */}
+                        <div className="relative h-9 w-9">
+                            {!searchExpanded ? (
+                                <motion.button
+                                    layoutId="search-box"
+                                    onClick={() => setSearchExpanded(true)}
+                                    className={buttonVariants({ variant: "ghost", size: "icon", className: "absolute inset-0 rounded-xl transition-none hover:bg-transparent text-muted-foreground hover:text-foreground" })}
                                 >
-                                    <X className="size-3.5" />
-                                </button>
-                            </motion.div>
+                                    <motion.span layout="position"><Search className="size-4 transition-colors duration-300" /></motion.span>
+                                </motion.button>
+                            ) : (
+                                <motion.div
+                                    layoutId="search-box"
+                                    className="absolute right-0 top-0 flex items-center gap-2 h-9 px-3 rounded-xl border"
+                                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                                >
+                                    <motion.span layout="position"><Search className="size-4 text-muted-foreground shrink-0" /></motion.span>
+                                    <input
+                                        type="text"
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(activeItem, e.target.value)}
+                                        autoFocus
+                                        className="w-20 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                                    />
+                                    <button
+                                        onClick={() => {
+                                            setSearchTerm(activeItem, '');
+                                            setSearchExpanded(false);
+                                        }}
+                                        className="p-0.5 rounded shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                                    >
+                                        <X className="size-3.5" />
+                                    </button>
+                                </motion.div>
+                            )}
+                        </div>
+
+                        {/* 页码指示器 */}
+                        <div className="flex items-center h-9 rounded-xl border">
+                            <button
+                                type="button"
+                                aria-label="Previous page"
+                                onClick={() => prevPage(activeItem)}
+                                disabled={page <= 1}
+                                className="size-8 inline-flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:hover:text-muted-foreground"
+                            >
+                                <ChevronLeft className="size-4" />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setPage(activeItem, 1)}
+                                className="px-2 text-sm tabular-nums text-muted-foreground hover:text-foreground"
+                                aria-label="Page indicator"
+                                title="Click to go to first page"
+                            >
+                                {page}/{totalPages}
+                            </button>
+                            <button
+                                type="button"
+                                aria-label="Next page"
+                                onClick={() => nextPage(activeItem)}
+                                disabled={page >= totalPages}
+                                className="size-8 inline-flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:hover:text-muted-foreground"
+                            >
+                                <ChevronRight className="size-4" />
+                            </button>
+                        </div>
+
+                        {/* 批量同步按钮 - 仅在渠道页面显示 */}
+                        {activeItem === 'channel' && (
+                            <Tooltip side="bottom" sideOffset={10} align="center">
+                                <TooltipTrigger asChild>
+                                    <Button
+                                        onClick={handleBatchSync}
+                                        disabled={isSyncing}
+                                        variant="ghost"
+                                        size="icon"
+                                        className="rounded-xl transition-none hover:bg-transparent text-muted-foreground hover:text-foreground"
+                                    >
+                                        <RefreshCw className={`size-4 transition-colors duration-300 ${isSyncing ? 'animate-spin' : ''}`} />
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                    {isSyncing ? t('syncing') : t('button')}
+                                </TooltipContent>
+                            </Tooltip>
                         )}
-                    </div>
 
-                    {/* 页码指示器 */}
-                    <div className="flex items-center h-9 rounded-xl border">
-                        <button
-                            type="button"
-                            aria-label="Previous page"
-                            onClick={() => prevPage(activeItem)}
-                            disabled={page <= 1}
-                            className="size-8 inline-flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:hover:text-muted-foreground"
-                        >
-                            <ChevronLeft className="size-4" />
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setPage(activeItem, 1)}
-                            className="px-2 text-sm tabular-nums text-muted-foreground hover:text-foreground"
-                            aria-label="Page indicator"
-                            title="Click to go to first page"
-                        >
-                            {page}/{totalPages}
-                        </button>
-                        <button
-                            type="button"
-                            aria-label="Next page"
-                            onClick={() => nextPage(activeItem)}
-                            disabled={page >= totalPages}
-                            className="size-8 inline-flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:hover:text-muted-foreground"
-                        >
-                            <ChevronRight className="size-4" />
-                        </button>
-                    </div>
+                        {/* 创建按钮 */}
+                        <MorphingDialog>
+                            <MorphingDialogTrigger className={buttonVariants({ variant: "ghost", size: "icon", className: "rounded-xl transition-none hover:bg-transparent text-muted-foreground hover:text-foreground" })}>
+                                <Plus className="size-4 transition-colors duration-300" />
+                            </MorphingDialogTrigger>
 
-                    {/* 批量同步按钮 - 仅在渠道页面显示 */}
-                    {activeItem === 'channel' && (
-                        <Tooltip side="bottom" sideOffset={10} align="center">
-                            <TooltipTrigger asChild>
-                                <Button
-                                    onClick={handleBatchSync}
-                                    disabled={syncChannel.isPending}
-                                    variant="ghost"
-                                    size="icon"
-                                    className="rounded-xl transition-none hover:bg-transparent text-muted-foreground hover:text-foreground"
-                                >
-                                    <RefreshCw className={`size-4 transition-colors duration-300 ${syncChannel.isPending ? 'animate-spin' : ''}`} />
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                                {syncChannel.isPending ? t('syncing') : t('button')}
-                            </TooltipContent>
-                        </Tooltip>
-                    )}
+                            <MorphingDialogContainer>
+                                <MorphingDialogContent className="w-fit max-w-full bg-card text-card-foreground px-6 py-4 rounded-3xl custom-shadow max-h-[calc(100vh-2rem)] flex flex-col overflow-hidden">
+                                    <CreateDialogContent activeItem={activeItem} />
+                                </MorphingDialogContent>
+                            </MorphingDialogContainer>
+                        </MorphingDialog>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
-                    {/* 创建按钮 */}
-                    <MorphingDialog>
-                        <MorphingDialogTrigger className={buttonVariants({ variant: "ghost", size: "icon", className: "rounded-xl transition-none hover:bg-transparent text-muted-foreground hover:text-foreground" })}>
-                            <Plus className="size-4 transition-colors duration-300" />
-                        </MorphingDialogTrigger>
-
-                        <MorphingDialogContainer>
-                            <MorphingDialogContent className="w-fit max-w-full bg-card text-card-foreground px-6 py-4 rounded-3xl custom-shadow max-h-[calc(100vh-2rem)] flex flex-col overflow-hidden">
-                                <CreateDialogContent activeItem={activeItem} />
-                            </MorphingDialogContent>
-                        </MorphingDialogContainer>
-                    </MorphingDialog>
-                </motion.div>
-            )}
-        </AnimatePresence>
+            {/* 同步进度对话框 */}
+            <SyncProgressDialog
+                open={syncDialogOpen}
+                onOpenChange={handleDialogOpenChange}
+                results={syncResults}
+                isCompleted={isSyncCompleted}
+            />
+        </>
     );
 }
 

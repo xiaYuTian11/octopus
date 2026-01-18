@@ -357,6 +357,16 @@ export function useSyncChannel() {
 }
 
 /**
+ * 同步单个渠道
+ * 
+ * @param channelId 渠道 ID
+ * @returns Promise<null>
+ */
+export async function syncSingleChannel(channelId: number): Promise<null> {
+    return apiClient.post<null>(`/api/v1/channel/sync/${channelId}`);
+}
+
+/**
  * 测试渠道请求
  */
 export type TestChannelRequest = {

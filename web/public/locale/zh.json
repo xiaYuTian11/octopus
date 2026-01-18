@@ -413,6 +413,19 @@
             "failed": "同步失败",
             "noAutoSyncChannels": "没有启用自动同步的渠道"
         },
+        "syncProgress": {
+            "title": "同步进度",
+            "completed": "已完成 {current}/{total}",
+            "successCount": "成功: {count}",
+            "errorCount": "失败: {count}",
+            "syncingCount": "进行中: {count}",
+            "statusPending": "等待中",
+            "statusSyncing": "同步中",
+            "statusSuccess": "成功",
+            "statusError": "失败",
+            "close": "关闭",
+            "syncing": "同步中..."
+        },
         "card": {
             "requestCount": "请求次数",
             "totalCost": "总成本",

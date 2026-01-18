@@ -52,6 +52,10 @@ func init() {
 				Handle(syncChannel),
 		).
 		AddRoute(
+			router.NewRoute("/sync/:id", http.MethodPost).
+				Handle(syncSingleChannel),
+		).
+		AddRoute(
 			router.NewRoute("/last-sync-time", http.MethodGet).
 				Handle(getLastSyncTime),
 		)
@@ -170,4 +174,48 @@ func syncChannel(c *gin.Context) {
 func getLastSyncTime(c *gin.Context) {
 	time := task.GetLastSyncModelsTime()
 	resp.Success(c, time)
+}
+
+// syncSingleChannel 同步单个渠道的模型列表
+func syncSingleChannel(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		resp.Error(c, http.StatusBadRequest, "无效的渠道ID")
+		return
+	}
+
+	// 获取渠道信息
+	channel, err := op.ChannelGet(id, c.Request.Context())
+	if err != nil {
+		resp.Error(c, http.StatusNotFound, "渠道不存在")
+		return
+	}
+
+	// 获取模型列表
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Minute)
+	defer cancel()
+
+	fetchModels, err := helper.FetchModels(ctx, *channel)
+	if err != nil {
+		resp.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// 更新渠道模型
+	newModels := strings.Join(fetchModels, ",")
+	if _, err := op.ChannelUpdate(&model.ChannelUpdateRequest{
+		ID:    channel.ID,
+		Model: &newModels,
+	}, ctx); err != nil {
+		resp.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// 自动分组
+	if len(fetchModels) > 0 {
+		helper.ChannelAutoGroup(channel, ctx)
+	}
+
+	resp.Success(c, nil)
 }

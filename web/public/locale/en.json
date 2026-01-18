@@ -413,6 +413,19 @@
             "failed": "Sync failed",
             "noAutoSyncChannels": "No channels with auto-sync enabled"
         },
+        "syncProgress": {
+            "title": "Sync Progress",
+            "completed": "Completed {current}/{total}",
+            "successCount": "Success: {count}",
+            "errorCount": "Failed: {count}",
+            "syncingCount": "Syncing: {count}",
+            "statusPending": "Pending",
+            "statusSyncing": "Syncing",
+            "statusSuccess": "Success",
+            "statusError": "Failed",
+            "close": "Close",
+            "syncing": "Syncing..."
+        },
         "card": {
             "requestCount": "Requests",
             "totalCost": "Total Cost",
