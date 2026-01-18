@@ -403,6 +403,16 @@
         }
     },
     "channel": {
+        "batchSync": {
+            "button": "批量同步",
+            "buttonMobile": "同步",
+            "syncing": "同步中",
+            "progress": "正在同步 {current}/{total}",
+            "success": "同步完成",
+            "successDetail": "成功: {success}, 失败: {failed}",
+            "failed": "同步失败",
+            "noAutoSyncChannels": "没有启用自动同步的渠道"
+        },
         "card": {
             "requestCount": "请求次数",
             "totalCost": "总成本",

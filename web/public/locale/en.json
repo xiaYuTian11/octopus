@@ -403,6 +403,16 @@
         }
     },
     "channel": {
+        "batchSync": {
+            "button": "Batch Sync",
+            "buttonMobile": "Sync",
+            "syncing": "Syncing",
+            "progress": "Syncing {current}/{total}",
+            "success": "Sync completed",
+            "successDetail": "Success: {success}, Failed: {failed}",
+            "failed": "Sync failed",
+            "noAutoSyncChannels": "No channels with auto-sync enabled"
+        },
         "card": {
             "requestCount": "Requests",
             "totalCost": "Total Cost",

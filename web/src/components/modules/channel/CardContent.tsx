@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState } from 'react';
 import {
     Trash2,
     CheckCircle2,
@@ -9,11 +9,8 @@ import {
     Activity,
     TrendingUp,
     Globe,
-    Key,
-    FlaskConical
+    Key
 } from 'lucide-react';
-import { BatchTestDialog, type TestTarget } from '@/components/common/BatchTestDialog';
-import { ModelSelectionDialog, type ModelOption } from '@/components/common/ModelSelectionDialog';
 import { useUpdateChannel, useDeleteChannel, type Channel, type UpdateChannelRequest } from '@/api/endpoints/channel';
 import {
     MorphingDialogTitle,
@@ -36,10 +33,6 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
     const deleteChannel = useDeleteChannel();
     const [isEditing, setIsEditing] = useState(false);
     const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
-    const [isTestDialogOpen, setIsTestDialogOpen] = useState(false);
-    const [isModelSelectionOpen, setIsModelSelectionOpen] = useState(false);
-    const [selectedModelsForTest, setSelectedModelsForTest] = useState<string[]>([]);
-    const tTest = useTranslations('test');
     const [formData, setFormData] = useState<ChannelFormData>({
         name: channel.name,
         type: channel.type,
@@ -156,54 +149,6 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
             deleteChannel.mutate(channel.id);
         }, 300);
     };
-
-    const getAllModels = useCallback((): string[] => {
-        const models: string[] = [];
-        if (channel.model) {
-            models.push(...channel.model.split(',').map(m => m.trim()).filter(Boolean));
-        }
-        if (channel.custom_model) {
-            models.push(...channel.custom_model.split(',').map(m => m.trim()).filter(Boolean));
-        }
-        return models;
-    }, [channel.model, channel.custom_model]);
-
-    const getModelOptions = useMemo((): ModelOption[] => {
-        return getAllModels().map(model => ({
-            model,
-            channelId: channel.id,
-            channelName: channel.name,
-        }));
-    }, [getAllModels, channel.id, channel.name]);
-
-    const getTestTargets = useCallback((models?: string[]): TestTarget[] => {
-        const targetModels = models || getAllModels();
-        return targetModels.map(model => ({
-            channelId: channel.id,
-            channelName: channel.name,
-            model,
-        }));
-    }, [getAllModels, channel.id, channel.name]);
-
-    const handleOpenModelSelection = useCallback(() => {
-        setIsModelSelectionOpen(true);
-    }, []);
-
-    const handleConfirmModelSelection = useCallback((models: string[]) => {
-        setSelectedModelsForTest(models);
-        // 延迟打开批量测试对话框，确保模型选择对话框完全关闭
-        setTimeout(() => {
-            setIsTestDialogOpen(true);
-        }, 100);
-    }, []);
-
-    const handleTestDialogClose = useCallback((open: boolean) => {
-        setIsTestDialogOpen(open);
-        if (!open) {
-            // 测试对话框关闭时重置选择
-            setSelectedModelsForTest([]);
-        }
-    }, []);
 
     return (
         <>
@@ -459,16 +404,7 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                             </div>
 
                             {/* 操作按钮 */}
-                            <div className="grid gap-3 sm:grid-cols-3 pt-2">
-                                <Button
-                                    onClick={handleOpenModelSelection}
-                                    variant="outline"
-                                    className="w-full rounded-2xl h-12"
-                                    disabled={getAllModels().length === 0}
-                                >
-                                    <FlaskConical className="size-4 mr-2" />
-                                    {tTest('batchTest')}
-                                </Button>
+                            <div className="grid gap-3 sm:grid-cols-2 pt-2">
                                 <Button
                                     onClick={() => (isConfirmingDelete ? setIsConfirmingDelete(false) : setIsEditing(true))}
                                     variant={isConfirmingDelete ? 'secondary' : 'default'}
@@ -508,21 +444,6 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                     </TabsContents>
                 </Tabs>
             </MorphingDialogDescription>
-
-            <ModelSelectionDialog
-                open={isModelSelectionOpen}
-                onOpenChange={setIsModelSelectionOpen}
-                models={getModelOptions}
-                initialSelected={selectedModelsForTest}
-                onConfirm={handleConfirmModelSelection}
-                title={`${tTest('selectModels')}: ${channel.name}`}
-            />
-
-            <BatchTestDialog
-                open={isTestDialogOpen}
-                onOpenChange={handleTestDialogClose}
-                targets={isTestDialogOpen ? getTestTargets(selectedModelsForTest.length > 0 ? selectedModelsForTest : undefined) : []}
-            />
         </>
     );
 }

@@ -1,18 +1,25 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useChannelList } from '@/api/endpoints/channel';
+import { RefreshCw } from 'lucide-react';
+import { useChannelList, useSyncChannel } from '@/api/endpoints/channel';
 import { Card } from './Card';
 import { usePaginationStore, useSearchStore } from '@/components/modules/toolbar';
 import { EASING } from '@/lib/animations/fluid-transitions';
 import { useGridPageSize } from '@/hooks/use-grid-page-size';
+import { Button } from '@/components/ui/button';
+import { toast } from '@/components/common/Toast';
+import { useTranslations } from 'next-intl';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/animate-ui/components/animate/tooltip';
 
 /** Channel card height: h-54 = 216px */
 const CHANNEL_CARD_HEIGHT = 216;
 
 export function Channel() {
     const { data: channelsData } = useChannelList();
+    const syncChannel = useSyncChannel();
+    const t = useTranslations('channel.batchSync');
     const pageKey = 'channel' as const;
     const pageSize = useGridPageSize({
         itemHeight: CHANNEL_CARD_HEIGHT,
@@ -50,46 +57,94 @@ export function Channel() {
         return filteredChannels.slice(start, start + pageSize);
     }, [filteredChannels, page, pageSize]);
 
+    // 批量同步处理
+    const handleBatchSync = () => {
+        // 检查是否有启用自动同步的渠道
+        const autoSyncChannels = channelsData?.filter(c => c.raw.auto_sync) || [];
+        
+        if (autoSyncChannels.length === 0) {
+            toast.error(t('noAutoSyncChannels'));
+            return;
+        }
+
+        syncChannel.mutate(undefined, {
+            onSuccess: () => {
+                toast.success(t('success'));
+            },
+            onError: (error) => {
+                toast.error(error.message || t('failed'));
+            },
+        });
+    };
+
     return (
-        <AnimatePresence mode="popLayout" initial={false} custom={direction}>
-            <motion.div
-                key={`channel-page-${page}`}
-                custom={direction}
-                variants={{
-                    enter: (d: number) => ({ x: d >= 0 ? 24 : -24, opacity: 0 }),
-                    center: { x: 0, opacity: 1 },
-                    exit: (d: number) => ({ x: d >= 0 ? -24 : 24, opacity: 0 }),
-                }}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                transition={{ duration: 0.25, ease: EASING.easeOutExpo }}
-            >
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                    <AnimatePresence mode="popLayout">
-                        {pagedChannels.map((channel, index) => (
-                            <motion.div
-                                key={"channel-" + channel.raw.id}
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{
-                                    opacity: 0,
-                                    scale: 0.95,
-                                    transition: { duration: 0.2 }
-                                }}
-                                transition={{
-                                    duration: 0.45,
-                                    ease: EASING.easeOutExpo,
-                                    delay: index === 0 ? 0 : Math.min(0.08 * Math.log2(index + 1), 0.4),
-                                }}
-                                layout={!searchTerm.trim()}
-                            >
-                                <Card channel={channel.raw} stats={channel.formatted} />
-                            </motion.div>
-                        ))}
-                    </AnimatePresence>
-                </div>
-            </motion.div>
-        </AnimatePresence>
+        <>
+            {/* 批量同步按钮 - 显示在内容区域顶部 */}
+            <div className="mb-4 flex justify-end">
+                <Tooltip side="bottom" sideOffset={10} align="end">
+                    <TooltipTrigger asChild>
+                        <Button
+                            onClick={handleBatchSync}
+                            disabled={syncChannel.isPending}
+                            variant="outline"
+                            size="sm"
+                            className="rounded-xl gap-2"
+                        >
+                            <RefreshCw className={`size-4 ${syncChannel.isPending ? 'animate-spin' : ''}`} />
+                            <span className="hidden sm:inline">
+                                {syncChannel.isPending ? t('syncing') : t('button')}
+                            </span>
+                            <span className="sm:hidden">
+                                {syncChannel.isPending ? t('syncing') : t('buttonMobile')}
+                            </span>
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        {t('button')}
+                    </TooltipContent>
+                </Tooltip>
+            </div>
+
+            <AnimatePresence mode="popLayout" initial={false} custom={direction}>
+                <motion.div
+                    key={`channel-page-${page}`}
+                    custom={direction}
+                    variants={{
+                        enter: (d: number) => ({ x: d >= 0 ? 24 : -24, opacity: 0 }),
+                        center: { x: 0, opacity: 1 },
+                        exit: (d: number) => ({ x: d >= 0 ? -24 : 24, opacity: 0 }),
+                    }}
+                    initial="enter"
+                    animate="center"
+                    exit="exit"
+                    transition={{ duration: 0.25, ease: EASING.easeOutExpo }}
+                >
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        <AnimatePresence mode="popLayout">
+                            {pagedChannels.map((channel, index) => (
+                                <motion.div
+                                    key={"channel-" + channel.raw.id}
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{
+                                        opacity: 0,
+                                        scale: 0.95,
+                                        transition: { duration: 0.2 }
+                                    }}
+                                    transition={{
+                                        duration: 0.45,
+                                        ease: EASING.easeOutExpo,
+                                        delay: index === 0 ? 0 : Math.min(0.08 * Math.log2(index + 1), 0.4),
+                                    }}
+                                    layout={!searchTerm.trim()}
+                                >
+                                    <Card channel={channel.raw} stats={channel.formatted} />
+                                </motion.div>
+                            ))}
+                        </AnimatePresence>
+                    </div>
+                </motion.div>
+            </AnimatePresence>
+        </>
     );
 }
