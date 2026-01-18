@@ -191,7 +191,10 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
 
     const handleConfirmModelSelection = useCallback((models: string[]) => {
         setSelectedModelsForTest(models);
-        setIsTestDialogOpen(true);
+        // 延迟打开批量测试对话框，确保模型选择对话框完全关闭
+        setTimeout(() => {
+            setIsTestDialogOpen(true);
+        }, 100);
     }, []);
 
     const handleTestDialogClose = useCallback((open: boolean) => {
