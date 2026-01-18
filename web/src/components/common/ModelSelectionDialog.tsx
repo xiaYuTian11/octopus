@@ -108,15 +108,8 @@ export function ModelSelectionDialog({
     const allSelected = filteredModels.length > 0 && selectedModels.size === filteredModels.length;
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent
-                className="sm:max-w-lg max-h-[90vh] flex flex-col"
-                onInteractOutside={(e) => e.preventDefault()}
-                onEscapeKeyDown={(e) => {
-                    e.preventDefault();
-                    onOpenChange(false);
-                }}
-            >
+        <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
+            <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
                 <DialogHeader>
                     <DialogTitle>{title || t('selectModels')}</DialogTitle>
                 </DialogHeader>
