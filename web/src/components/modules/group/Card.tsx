@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Trash2, X, Pencil } from 'lucide-react';
+import { Trash2, X, Pencil, FlaskConical } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { type Group, useDeleteGroup, useUpdateGroup } from '@/api/endpoints/group';
 import { useModelChannelList } from '@/api/endpoints/model';
@@ -9,6 +9,7 @@ import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/common/Toast';
 import { CopyIconButton } from '@/components/common/CopyButton';
+import { BatchTestDialog, type TestTarget } from '@/components/common/BatchTestDialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/animate-ui/components/animate/tooltip';
 import type { SelectedMember } from './ItemList';
 import { MemberList } from './ItemList';
@@ -69,12 +70,14 @@ function EditDialogContent({ group, displayMembers, isSubmitting, onSubmit }: Ed
 
 export function GroupCard({ group }: { group: Group }) {
     const t = useTranslations('group');
+    const tTest = useTranslations('test');
     const updateGroup = useUpdateGroup();
     const deleteGroup = useDeleteGroup();
     const { data: modelChannels = [] } = useModelChannelList();
 
     const [confirmDelete, setConfirmDelete] = useState(false);
     const [members, setMembers] = useState<SelectedMember[]>([]);
+    const [isTestDialogOpen, setIsTestDialogOpen] = useState(false);
     const isDragging = useRef(false);
     const weightTimerRef = useRef<NodeJS.Timeout | null>(null);
     const membersRef = useRef<SelectedMember[]>([]);
@@ -237,6 +240,14 @@ export function GroupCard({ group }: { group: Group }) {
         });
     }, [group.first_token_time_out, group.id, group.items, group.match_regex, group.mode, group.name, onSuccess, onError, updateGroup]);
 
+    const getTestTargets = useCallback((): TestTarget[] => {
+        return displayMembers.map(m => ({
+            channelId: m.channel_id,
+            channelName: m.channel_name,
+            model: m.name,
+        }));
+    }, [displayMembers]);
+
     return (
         <article className="flex flex-col rounded-3xl border border-border bg-card text-card-foreground p-4 custom-shadow">
             <header className="flex items-start justify-between mb-3 relative overflow-visible rounded-xl -mx-1 px-1 -my-1 py-1">
@@ -250,6 +261,20 @@ export function GroupCard({ group }: { group: Group }) {
                 </div>
 
                 <div className="flex items-center gap-1 shrink-0">
+                    <Tooltip side="top" sideOffset={10} align="center">
+                        <TooltipTrigger>
+                            <button
+                                type="button"
+                                onClick={() => setIsTestDialogOpen(true)}
+                                disabled={displayMembers.length === 0}
+                                className="p-1.5 rounded-lg transition-colors hover:bg-muted text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <FlaskConical className="size-4" />
+                            </button>
+                        </TooltipTrigger>
+                        <TooltipContent>{tTest('testGroup')}</TooltipContent>
+                    </Tooltip>
+
                     <MorphingDialog>
                         <MorphingDialogTrigger className="p-1.5 rounded-lg transition-colors hover:bg-muted text-muted-foreground hover:text-foreground">
                             <Tooltip side="top" sideOffset={10} align="center">
@@ -348,6 +373,13 @@ export function GroupCard({ group }: { group: Group }) {
                     layoutScope={`card-${group.id ?? 'unknown'}`}
                 />
             </section>
+
+            <BatchTestDialog
+                open={isTestDialogOpen}
+                onOpenChange={setIsTestDialogOpen}
+                targets={getTestTargets()}
+                title={`${tTest('testGroup')}: ${group.name}`}
+            />
         </article >
     );
 }

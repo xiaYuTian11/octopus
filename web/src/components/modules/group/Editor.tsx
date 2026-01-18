@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useMemo, useState, type FormEvent } from 'react';
-import { Check, ChevronDownIcon, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { Check, ChevronDownIcon, Plus, Sparkles, Trash2, Search } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import * as AccordionPrimitive from '@radix-ui/react-accordion';
 import { useModelChannelList, type LLMChannel } from '@/api/endpoints/model';
@@ -42,6 +42,7 @@ function ModelPickerSection({
     autoAddDisabled: boolean;
 }) {
     const t = useTranslations('group');
+    const [searchQuery, setSearchQuery] = useState('');
 
     const selectedKeys = useMemo(() => new Set(selectedMembers.map(memberKey)), [selectedMembers]);
 
@@ -57,6 +58,21 @@ function ModelPickerSection({
             .map((c) => ({ ...c, models: [...c.models].sort((a, b) => a.name.localeCompare(b.name)) }))
             .sort((a, b) => a.id - b.id);
     }, [modelChannels]);
+
+    const filteredChannels = useMemo(() => {
+        if (!searchQuery.trim()) return channels;
+        const query = searchQuery.toLowerCase();
+        return channels
+            .map(channel => {
+                const channelNameMatches = channel.name.toLowerCase().includes(query);
+                const filteredModels = channel.models.filter(m =>
+                    channelNameMatches || m.name.toLowerCase().includes(query)
+                );
+                if (filteredModels.length === 0) return null;
+                return { ...channel, models: filteredModels };
+            })
+            .filter((c): c is NonNullable<typeof c> => c !== null);
+    }, [channels, searchQuery]);
 
     return (
         <div className="rounded-xl border border-border/50 bg-muted/30 flex flex-col min-h-0">
@@ -85,9 +101,22 @@ function ModelPickerSection({
                 </button>
             </div>
 
+            <div className="px-2 pt-2">
+                <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                    <Input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder={t('form.searchPlaceholder')}
+                        className="pl-8 h-9 rounded-lg"
+                    />
+                </div>
+            </div>
+
             <div className="flex-1 min-h-0 overflow-y-auto p-2">
                 <Accordion type="multiple" className="w-full space-y-2">
-                    {channels.map((channel) => {
+                    {filteredChannels.map((channel) => {
                         const total = channel.models.length;
                         const selectedCount = channel.models.reduce(
                             (acc, m) => acc + (selectedKeys.has(memberKey(m)) ? 1 : 0),

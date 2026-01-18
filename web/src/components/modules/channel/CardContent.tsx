@@ -9,8 +9,10 @@ import {
     Activity,
     TrendingUp,
     Globe,
-    Key
+    Key,
+    FlaskConical
 } from 'lucide-react';
+import { BatchTestDialog, type TestTarget } from '@/components/common/BatchTestDialog';
 import { useUpdateChannel, useDeleteChannel, type Channel, type UpdateChannelRequest } from '@/api/endpoints/channel';
 import {
     MorphingDialogTitle,
@@ -33,6 +35,8 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
     const deleteChannel = useDeleteChannel();
     const [isEditing, setIsEditing] = useState(false);
     const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+    const [isTestDialogOpen, setIsTestDialogOpen] = useState(false);
+    const tTest = useTranslations('test');
     const [formData, setFormData] = useState<ChannelFormData>({
         name: channel.name,
         type: channel.type,
@@ -148,6 +152,21 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
         setTimeout(() => {
             deleteChannel.mutate(channel.id);
         }, 300);
+    };
+
+    const getTestTargets = (): TestTarget[] => {
+        const models: string[] = [];
+        if (channel.model) {
+            models.push(...channel.model.split(',').map(m => m.trim()).filter(Boolean));
+        }
+        if (channel.custom_model) {
+            models.push(...channel.custom_model.split(',').map(m => m.trim()).filter(Boolean));
+        }
+        return models.map(model => ({
+            channelId: channel.id,
+            channelName: channel.name,
+            model,
+        }));
     };
 
     return (
@@ -404,7 +423,16 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                             </div>
 
                             {/* 操作按钮 */}
-                            <div className="grid gap-3 sm:grid-cols-2 pt-2">
+                            <div className="grid gap-3 sm:grid-cols-3 pt-2">
+                                <Button
+                                    onClick={() => setIsTestDialogOpen(true)}
+                                    variant="outline"
+                                    className="w-full rounded-2xl h-12"
+                                    disabled={getTestTargets().length === 0}
+                                >
+                                    <FlaskConical className="size-4 mr-2" />
+                                    {tTest('batchTest')}
+                                </Button>
                                 <Button
                                     onClick={() => (isConfirmingDelete ? setIsConfirmingDelete(false) : setIsEditing(true))}
                                     variant={isConfirmingDelete ? 'secondary' : 'default'}
@@ -444,6 +472,12 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                     </TabsContents>
                 </Tabs>
             </MorphingDialogDescription>
+
+            <BatchTestDialog
+                open={isTestDialogOpen}
+                onOpenChange={setIsTestDialogOpen}
+                targets={getTestTargets()}
+            />
         </>
     );
 }

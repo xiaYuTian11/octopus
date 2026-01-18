@@ -1,4 +1,15 @@
 {
+    "test": {
+        "title": "渠道连通性测试",
+        "progress": "测试进度",
+        "success": "成功",
+        "failed": "失败",
+        "cancel": "取消",
+        "close": "关闭",
+        "retry": "重试",
+        "batchTest": "批量测试",
+        "testGroup": "测试分组"
+    },
     "login": {
         "username": "用户名",
         "usernamePlaceholder": "请输入用户名",
@@ -319,7 +330,8 @@
             "autoAdd": "自动添加",
             "clear": "清空",
             "selectChannel": "渠道",
-            "selectModel": "模型"
+            "selectModel": "模型",
+            "searchPlaceholder": "搜索渠道或模型..."
         },
         "mode": {
             "roundRobin": "轮询",

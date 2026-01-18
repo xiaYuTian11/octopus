@@ -1,4 +1,15 @@
 {
+    "test": {
+        "title": "Channel Connectivity Test",
+        "progress": "Progress",
+        "success": "Success",
+        "failed": "Failed",
+        "cancel": "Cancel",
+        "close": "Close",
+        "retry": "Retry",
+        "batchTest": "Batch Test",
+        "testGroup": "Test Group"
+    },
     "login": {
         "username": "Username",
         "usernamePlaceholder": "Enter your username",
@@ -319,7 +330,8 @@
             "autoAdd": "Auto Add",
             "clear": "Clear",
             "selectChannel": "Channel",
-            "selectModel": "Model"
+            "selectModel": "Model",
+            "searchPlaceholder": "Search channels or models..."
         },
         "mode": {
             "roundRobin": "Round Robin",

@@ -355,3 +355,45 @@ export function useSyncChannel() {
         },
     });
 }
+
+/**
+ * 测试渠道请求
+ */
+export type TestChannelRequest = {
+    channel_id: number;
+    model: string;
+};
+
+/**
+ * 测试渠道响应
+ */
+export type TestChannelResponse = {
+    success: boolean;
+    latency: number;
+    error?: string;
+};
+
+/**
+ * 测试渠道 Hook
+ *
+ * @example
+ * const testChannel = useTestChannel();
+ *
+ * testChannel.mutate({
+ *   channel_id: 1,
+ *   model: 'gpt-4',
+ * });
+ */
+export function useTestChannel() {
+    return useMutation({
+        mutationFn: async (data: TestChannelRequest) => {
+            return apiClient.post<TestChannelResponse>('/api/v1/channel/test', data);
+        },
+        onSuccess: (data) => {
+            logger.log('渠道测试完成:', data);
+        },
+        onError: (error) => {
+            logger.error('渠道测试失败:', error);
+        },
+    });
+}
