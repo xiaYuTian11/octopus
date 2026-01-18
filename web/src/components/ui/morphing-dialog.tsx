@@ -221,6 +221,19 @@ function MorphingDialogContent({
     },
     (event) => {
       const target = event.target as HTMLElement | null;
+      
+      // Check for Radix UI Dialog Portal elements
+      if (target?.closest('[data-slot="dialog-content"]')) {
+        return true;
+      }
+      if (target?.closest('[data-slot="dialog-overlay"]')) {
+        return true;
+      }
+      if (target?.closest('[role="dialog"]')) {
+        return true;
+      }
+      
+      // Check for Select content
       if (target?.closest('[data-slot="select-content"]')) {
         return true;
       }
@@ -228,6 +241,8 @@ function MorphingDialogContent({
       if (openSelectContent) {
         return true;
       }
+      
+      // Check for Popover content
       if (target?.closest('[data-slot="popover-content"]')) {
         return true;
       }
@@ -235,6 +250,7 @@ function MorphingDialogContent({
       if (openPopoverContent) {
         return true;
       }
+      
       return false;
     }
   );
