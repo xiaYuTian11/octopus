@@ -104,6 +104,7 @@ func Handler(inboundType inbound.InboundType, c *gin.Context) {
 				metrics:              metrics,
 				usedKey:              channel.GetChannelKey(),
 				firstTokenTimeOutSec: group.FirstTokenTimeOut,
+				validator:            NewResponseValidator(),
 			}
 
 			if statusCode, err := rc.forward(); err == nil {
@@ -314,7 +315,20 @@ func (rc *relayContext) handleStreamResponse(ctx context.Context, response *http
 
 			// 转换流式数据
 			data, err := rc.transformStreamData(ctx, r.data)
-			if err != nil || len(data) == 0 {
+			if err != nil {
+				// 如果是响应质量错误且还未写入客户端,可以重试其他渠道
+				if IsResponseQualityError(err) && !rc.c.Writer.Written() {
+					log.Warnf("stream validation failed before client write, will retry next channel: %v", err)
+					_ = response.Body.Close()
+					return err
+				}
+				// 其他错误或已写入客户端,继续处理
+				if err != nil {
+					log.Warnf("stream transform error: %v", err)
+					continue
+				}
+			}
+			if len(data) == 0 {
 				continue
 			}
 			// 记录首个 Token 时间
@@ -359,6 +373,17 @@ func (rc *relayContext) transformStreamData(ctx context.Context, data string) ([
 			internalStream.Usage.PromptTokens, internalStream.Usage.CompletionTokens)
 	}
 
+	// 验证流式响应块的质量
+	if rc.validator != nil {
+		if err := rc.validator.ValidateStreamChunk(internalStream); err != nil {
+			log.Warnf("stream chunk validation failed: %v", err)
+			// 对于流式响应,如果检测到质量问题,返回错误以触发重试
+			if IsResponseQualityError(err) {
+				return nil, fmt.Errorf("stream validation failed: %w", err)
+			}
+		}
+	}
+
 	// 内部格式 → 入站格式
 	inStream, err := rc.inAdapter.TransformStream(ctx, internalStream)
 	if err != nil {
@@ -376,6 +401,14 @@ func (rc *relayContext) handleResponse(ctx context.Context, response *http.Respo
 	if err != nil {
 		log.Warnf("failed to transform response: %v", err)
 		return fmt.Errorf("failed to transform outbound response: %w", err)
+	}
+
+	// 验证响应质量
+	if rc.validator != nil {
+		if err := rc.validator.ValidateResponse(internalResponse); err != nil {
+			log.Warnf("response validation failed: %v", err)
+			return fmt.Errorf("response validation failed: %w", err)
+		}
 	}
 
 	// 内部格式 → 入站格式

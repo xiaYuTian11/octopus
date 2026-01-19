@@ -52,4 +52,7 @@ type relayContext struct {
 	// firstTokenTimeOutSec: streaming-only "time to first token" timeout for the selected group/channel.
 	// When >0 and stream doesn't produce any transformed output within this duration, we abort and retry next channel.
 	firstTokenTimeOutSec int
+
+	// validator: 响应质量验证器，用于检测模型输出崩溃等异常
+	validator *ResponseValidator
 }

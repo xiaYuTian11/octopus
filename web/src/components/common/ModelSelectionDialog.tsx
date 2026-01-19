@@ -124,8 +124,8 @@ export function ModelSelectionDialog({
     const allFilteredSelected = filteredModels.length > 0 && selectedFilteredCount === filteredModels.length;
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
-            <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col touch-auto">
                 <DialogHeader>
                     <DialogTitle>{title || t('selectModels')}</DialogTitle>
                 </DialogHeader>
@@ -135,11 +135,12 @@ export function ModelSelectionDialog({
                         <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
                         <Input
                             ref={searchInputRef}
-                            type="text"
+                            type="search"
+                            inputMode="search"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder={t('searchModels')}
-                            className="pl-8"
+                            className="pl-8 min-h-[44px] sm:min-h-10"
                         />
                     </div>
 
@@ -166,7 +167,7 @@ export function ModelSelectionDialog({
                         </button>
                     </div>
 
-                    <div className="flex-1 min-h-0 overflow-y-auto space-y-2 border rounded-xl p-2">
+                    <div className="flex-1 min-h-0 overflow-y-auto space-y-2 border rounded-xl p-2 overscroll-contain [-webkit-overflow-scrolling:touch]">
                         {filteredModels.map((m) => {
                             const isSelected = selectedModels.has(m.model);
                             return (

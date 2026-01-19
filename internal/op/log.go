@@ -128,6 +128,17 @@ func RelayLogAdd(ctx context.Context, relayLog model.RelayLog) error {
 
 	relayLogCacheLock.Lock()
 	relayLogCache = append(relayLogCache, relayLog)
+
+	// 对于错误日志（Error 字段不为空），立即写入数据库
+	if enabled && relayLog.Error != "" {
+		relayLogCacheLock.Unlock()
+		if err := relayLogFlushToDB(ctx); err != nil {
+			log.Errorf("刷新错误日志到数据库失败: %v", err)
+		}
+		return nil
+	}
+
+	// 原有的批量写入逻辑
 	if len(relayLogCache) >= maxSize {
 		if enabled {
 			relayLogCacheLock.Unlock()
