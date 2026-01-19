@@ -95,6 +95,15 @@ func Handler(inboundType inbound.InboundType, c *gin.Context) {
 				continue
 			}
 
+			// 获取渠道密钥
+			usedKey, err := channel.GetChannelKey()
+			if err != nil {
+				log.Warnf("failed to get channel key for channel %s: %v", channel.Name, err)
+				lastErr = fmt.Errorf("failed to get channel key: %w", err)
+				item = b.Next(group.Items, item)
+				continue
+			}
+
 			rc := &relayContext{
 				c:                    c,
 				inAdapter:            inAdapter,
@@ -102,7 +111,7 @@ func Handler(inboundType inbound.InboundType, c *gin.Context) {
 				internalRequest:      internalRequest,
 				channel:              channel,
 				metrics:              metrics,
-				usedKey:              channel.GetChannelKey(),
+				usedKey:              usedKey,
 				firstTokenTimeOutSec: group.FirstTokenTimeOut,
 				validator:            NewResponseValidator(),
 			}
@@ -212,19 +221,34 @@ func (rc *relayContext) forward() (int, error) {
 
 // copyHeaders 复制请求头，过滤 hop-by-hop 头
 func (rc *relayContext) copyHeaders(outboundRequest *http.Request) {
+	log.Infof("[copyHeaders] channel: %s, customHeaders count: %d", rc.channel.Name, len(rc.channel.CustomHeader))
+
 	for key, values := range rc.c.Request.Header {
-		if hopByHopHeaders[strings.ToLower(key)] {
+		keyLower := strings.ToLower(key)
+		if hopByHopHeaders[keyLower] {
 			continue
+		}
+		// 过滤可能导致问题的User-Agent头部
+		if keyLower == "user-agent" {
+			log.Debugf("[copyHeaders] skipping User-Agent header: %s", values)
+			continue // 让Go使用默认User-Agent
 		}
 		for _, value := range values {
 			outboundRequest.Header.Set(key, value)
 		}
 	}
+
+	// 自定义头部处理保持不变
 	if len(rc.channel.CustomHeader) > 0 {
 		for _, header := range rc.channel.CustomHeader {
 			outboundRequest.Header.Set(header.HeaderKey, header.HeaderValue)
+			log.Debugf("[copyHeaders] custom header: %s = %s", header.HeaderKey, header.HeaderValue)
 		}
 	}
+
+	// 记录最终的User-Agent
+	finalUA := outboundRequest.Header.Get("User-Agent")
+	log.Infof("[copyHeaders] final User-Agent: %s", finalUA)
 }
 
 // sendRequest 发送 HTTP 请求
@@ -246,6 +270,10 @@ func (rc *relayContext) sendRequest(req *http.Request) (*http.Response, error) {
 
 // handleStreamResponse 处理流式响应
 func (rc *relayContext) handleStreamResponse(ctx context.Context, response *http.Response) error {
+	// 记录响应头部用于调试
+	log.Debugf("[handleStreamResponse] Response Status: %d", response.StatusCode)
+	log.Debugf("[handleStreamResponse] Content-Type: %s", response.Header.Get("Content-Type"))
+
 	// 流式响应应当是 SSE
 	// 某些上游可能会返回非SSE的JSON响应 (由于 Accept headers 配置错误)
 	if ct := response.Header.Get("Content-Type"); ct != "" && !strings.Contains(strings.ToLower(ct), "text/event-stream") {
@@ -260,6 +288,7 @@ func (rc *relayContext) handleStreamResponse(ctx context.Context, response *http
 	rc.c.Header("X-Accel-Buffering", "no")
 
 	firstToken := true
+	hasReceivedData := false // 添加标志跟踪是否收到数据
 
 	// Streaming "time to first token" timeout: only applies before we write anything to the client.
 	// We read SSE events in a goroutine so we can race the first meaningful output against a timer.
@@ -305,6 +334,11 @@ func (rc *relayContext) handleStreamResponse(ctx context.Context, response *http
 			return fmt.Errorf("first token timeout (%ds)", rc.firstTokenTimeOutSec)
 		case r, ok := <-results:
 			if !ok {
+				// 检查是否收到了任何有效数据
+				if !hasReceivedData {
+					log.Warnf("[handleStreamResponse] stream ended without receiving any data for channel: %s", rc.channel.Name)
+					return fmt.Errorf("stream ended without receiving any data")
+				}
 				log.Infof("stream end")
 				return nil
 			}
@@ -328,28 +362,28 @@ func (rc *relayContext) handleStreamResponse(ctx context.Context, response *http
 					continue
 				}
 			}
-			if len(data) == 0 {
-				continue
-			}
-			// 记录首个 Token 时间
-			if firstToken {
-				rc.metrics.SetFirstTokenTime(time.Now())
-				firstToken = false
-				// Disable the first-token timer once we have meaningful output.
-				if firstTokenTimer != nil {
-					if !firstTokenTimer.Stop() {
-						select {
-						case <-firstTokenTimer.C:
-						default:
+			if len(data) > 0 {
+				hasReceivedData = true // 标记收到了数据
+				// 记录首个 Token 时间
+				if firstToken {
+					rc.metrics.SetFirstTokenTime(time.Now())
+					firstToken = false
+					// Disable the first-token timer once we have meaningful output.
+					if firstTokenTimer != nil {
+						if !firstTokenTimer.Stop() {
+							select {
+							case <-firstTokenTimer.C:
+							default:
+							}
 						}
+						firstTokenTimer = nil
+						firstTokenC = nil
 					}
-					firstTokenTimer = nil
-					firstTokenC = nil
 				}
-			}
 
-			rc.c.Writer.Write(data)
-			rc.c.Writer.Flush()
+				rc.c.Writer.Write(data)
+				rc.c.Writer.Flush()
+			}
 		}
 	}
 }

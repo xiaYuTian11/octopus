@@ -27,6 +27,15 @@ func setBrowserHeaders(req *http.Request) {
 }
 
 func FetchModels(ctx context.Context, request model.Channel) ([]string, error) {
+	// 验证渠道密钥
+	key, err := request.GetChannelKey()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get channel key: %w", err)
+	}
+	if key.ChannelKey == "" {
+		return nil, fmt.Errorf("channel key is empty")
+	}
+
 	client, err := ChannelHttpClient(&request)
 	if err != nil {
 		return nil, err
@@ -120,6 +129,11 @@ func parseJSONResponse(resp *http.Response, result interface{}) error {
 
 // refer: https://platform.openai.com/docs/api-reference/models/list
 func fetchOpenAIModels(client *http.Client, ctx context.Context, request model.Channel) ([]string, error) {
+	key, err := request.GetChannelKey()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get channel key: %w", err)
+	}
+
 	req, _ := http.NewRequestWithContext(
 		ctx,
 		http.MethodGet,
@@ -127,7 +141,7 @@ func fetchOpenAIModels(client *http.Client, ctx context.Context, request model.C
 		nil,
 	)
 	setBrowserHeaders(req)
-	req.Header.Set("Authorization", "Bearer "+request.GetChannelKey().ChannelKey)
+	req.Header.Set("Authorization", "Bearer "+key.ChannelKey)
 
 	resp, err := client.Do(req)
 	if err != nil {
@@ -149,6 +163,11 @@ func fetchOpenAIModels(client *http.Client, ctx context.Context, request model.C
 
 // refer: https://ai.google.dev/api/models
 func fetchGeminiModels(client *http.Client, ctx context.Context, request model.Channel) ([]string, error) {
+	key, err := request.GetChannelKey()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get channel key: %w", err)
+	}
+
 	var allModels []string
 	pageToken := ""
 
@@ -160,7 +179,7 @@ func fetchGeminiModels(client *http.Client, ctx context.Context, request model.C
 			nil,
 		)
 		setBrowserHeaders(req)
-		req.Header.Set("X-Goog-Api-Key", request.GetChannelKey().ChannelKey)
+		req.Header.Set("X-Goog-Api-Key", key.ChannelKey)
 
 		if pageToken != "" {
 			q := req.URL.Query()
@@ -197,6 +216,10 @@ func fetchGeminiModels(client *http.Client, ctx context.Context, request model.C
 
 // refer: https://platform.claude.com/docs
 func fetchAnthropicModels(client *http.Client, ctx context.Context, request model.Channel) ([]string, error) {
+	key, err := request.GetChannelKey()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get channel key: %w", err)
+	}
 
 	var allModels []string
 	var afterID string
@@ -209,7 +232,7 @@ func fetchAnthropicModels(client *http.Client, ctx context.Context, request mode
 			nil,
 		)
 		setBrowserHeaders(req)
-		req.Header.Set("X-Api-Key", request.GetChannelKey().ChannelKey)
+		req.Header.Set("X-Api-Key", key.ChannelKey)
 		req.Header.Set("Anthropic-Version", "2023-06-01")
 
 		// 设置多页参数

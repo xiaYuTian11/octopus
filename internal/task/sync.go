@@ -37,7 +37,9 @@ func SyncModelsTask() {
 		}
 		fetchModels, err := helper.FetchModels(ctx, channel)
 		if err != nil {
-			log.Warnf("failed to fetch models for channel %s: %v", channel.Name, err)
+			// 提供更详细的错误信息，包括可能的原因
+			log.Warnf("failed to fetch models for channel %s (ID: %d, Type: %d): %v",
+				channel.Name, channel.ID, channel.Type, err)
 			continue
 		}
 		oldModels := xstrings.SplitTrimCompact(",", channel.Model)

@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -122,9 +123,10 @@ func (c *Channel) GetBaseUrl() string {
 
 // GetChannelKey 选择最佳的渠道密钥
 // 使用互斥锁保护，防止并发调用时的竞态条件
-func (c *Channel) GetChannelKey() ChannelKey {
+// 返回选中的密钥和可能的错误
+func (c *Channel) GetChannelKey() (ChannelKey, error) {
 	if c == nil || len(c.Keys) == 0 {
-		return ChannelKey{}
+		return ChannelKey{}, fmt.Errorf("no keys configured for channel")
 	}
 
 	// 加锁保护密钥选择过程，防止多个 goroutine 同时选中同一个 key
@@ -154,7 +156,7 @@ func (c *Channel) GetChannelKey() ChannelKey {
 	}
 
 	if !bestSet {
-		return ChannelKey{}
+		return ChannelKey{}, fmt.Errorf("no available keys (all disabled or rate-limited)")
 	}
-	return best
+	return best, nil
 }
