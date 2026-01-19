@@ -1,6 +1,7 @@
 package model
 
 import (
+	"sync"
 	"time"
 
 	"github.com/bestruirui/octopus/internal/transformer/outbound"
@@ -31,6 +32,9 @@ type Channel struct {
 	ParamOverride *string               `json:"param_override"`
 	ChannelProxy  *string               `json:"channel_proxy"`
 	Stats         *StatsChannel         `json:"stats,omitempty" gorm:"foreignKey:ChannelID"`
+
+	// keyMutex 保护密钥选择过程，防止并发竞态条件
+	keyMutex sync.Mutex `json:"-" gorm:"-"`
 }
 
 type BaseUrl struct {
@@ -116,10 +120,16 @@ func (c *Channel) GetBaseUrl() string {
 	return bestURL
 }
 
+// GetChannelKey 选择最佳的渠道密钥
+// 使用互斥锁保护，防止并发调用时的竞态条件
 func (c *Channel) GetChannelKey() ChannelKey {
 	if c == nil || len(c.Keys) == 0 {
 		return ChannelKey{}
 	}
+
+	// 加锁保护密钥选择过程，防止多个 goroutine 同时选中同一个 key
+	c.keyMutex.Lock()
+	defer c.keyMutex.Unlock()
 
 	nowSec := time.Now().Unix()
 

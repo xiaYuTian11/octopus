@@ -4,7 +4,7 @@ import { useEffect, useMemo } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useChannelList } from '@/api/endpoints/channel';
 import { Card } from './Card';
-import { usePaginationStore, useSearchStore } from '@/components/modules/toolbar';
+import { usePaginationStore, useSearchStore, SHOW_ALL_PAGE_SIZE } from '@/components/modules/toolbar';
 import { EASING } from '@/lib/animations/fluid-transitions';
 import { useGridPageSize } from '@/hooks/use-grid-page-size';
 
@@ -14,17 +14,22 @@ const CHANNEL_CARD_HEIGHT = 216;
 export function Channel() {
     const { data: channelsData } = useChannelList();
     const pageKey = 'channel' as const;
-    const pageSize = useGridPageSize({
+    const autoPageSize = useGridPageSize({
         itemHeight: CHANNEL_CARD_HEIGHT,
         gap: 16,
         columns: { default: 1, md: 2, lg: 3, xl: 4 },
     });
     const searchTerm = useSearchStore((s) => s.getSearchTerm(pageKey));
     const page = usePaginationStore((s) => s.getPage(pageKey));
+    const storedPageSize = usePaginationStore((s) => s.getPageSize(pageKey));
+    const isShowAll = usePaginationStore((s) => s.isShowAll(pageKey));
     const setPage = usePaginationStore((s) => s.setPage);
     const setTotalItems = usePaginationStore((s) => s.setTotalItems);
     const setPageSize = usePaginationStore((s) => s.setPageSize);
     const direction = usePaginationStore((s) => s.getDirection(pageKey));
+    
+    // 使用存储的 pageSize，如果是"显示全部"则使用 SHOW_ALL_PAGE_SIZE
+    const pageSize = isShowAll ? SHOW_ALL_PAGE_SIZE : storedPageSize;
 
     const filteredChannels = useMemo(() => {
         if (!channelsData) return [];

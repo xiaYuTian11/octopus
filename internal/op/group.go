@@ -155,10 +155,15 @@ func GroupUpdate(req *model.GroupUpdateRequest, ctx context.Context) (*model.Gro
 		return nil, err
 	}
 
+	// 获取更新后的分组信息
 	group, _ := groupCache.Get(req.ID)
-	if oldName != "" && oldName != group.Name {
+
+	// 如果名称发生变更，需要删除旧名称的映射
+	// 注意：groupRefreshCacheByID 已经设置了新名称的映射
+	if req.Name != nil && *req.Name != oldName {
 		groupMap.Del(oldName)
 	}
+
 	return &group, nil
 }
 

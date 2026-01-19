@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import type { NavItem } from '@/components/modules/navbar';
 
+/** 特殊值：表示"显示全部" */
+export const SHOW_ALL_PAGE_SIZE = 9999;
+
 interface PaginationState {
     pages: Partial<Record<NavItem, number>>;
     pageSizes: Partial<Record<NavItem, number>>;
@@ -11,6 +14,7 @@ interface PaginationState {
     getPageSize: (page: NavItem) => number;
     getTotalPages: (page: NavItem) => number;
     getDirection: (page: NavItem) => 1 | -1;
+    isShowAll: (page: NavItem) => boolean;
 
     setPage: (page: NavItem, value: number) => void;
     setPageSize: (page: NavItem, value: number) => void;
@@ -27,12 +31,19 @@ export const usePaginationStore = create<PaginationState>((set, get) => ({
     directions: {},
 
     getPage: (page) => get().pages[page] || 1,
-    getPageSize: (page) => get().pageSizes[page] || 12,
+    getPageSize: (page) => get().pageSizes[page] || SHOW_ALL_PAGE_SIZE,
     getTotalPages: (page) => {
+        const pageSize = get().pageSizes[page] || SHOW_ALL_PAGE_SIZE;
+        // 如果是"显示全部"模式，总页数为1
+        if (pageSize >= SHOW_ALL_PAGE_SIZE) return 1;
         const total = get().totalItems[page] || 0;
-        return Math.max(1, Math.ceil(total / (get().pageSizes[page] || 12)));
+        return Math.max(1, Math.ceil(total / pageSize));
     },
     getDirection: (page) => get().directions[page] || 1,
+    isShowAll: (page) => {
+        const pageSize = get().pageSizes[page] || SHOW_ALL_PAGE_SIZE;
+        return pageSize >= SHOW_ALL_PAGE_SIZE;
+    },
 
     setPage: (page, value) => {
         const totalPages = get().getTotalPages(page);

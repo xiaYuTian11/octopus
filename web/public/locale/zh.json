@@ -75,6 +75,11 @@
             "success": "复制成功",
             "failed": "复制失败",
             "noContent": "无可复制内容"
+        },
+        "pagination": {
+            "all": "全部",
+            "showAll": "显示全部",
+            "total": "共 {count} 条"
         }
     },
     "home": {

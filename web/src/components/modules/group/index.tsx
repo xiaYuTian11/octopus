@@ -4,7 +4,7 @@ import { useEffect, useMemo } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { GroupCard } from './Card';
 import { useGroupList } from '@/api/endpoints/group';
-import { usePaginationStore, useSearchStore } from '@/components/modules/toolbar';
+import { usePaginationStore, useSearchStore, SHOW_ALL_PAGE_SIZE } from '@/components/modules/toolbar';
 import { EASING } from '@/lib/animations/fluid-transitions';
 import { useGridPageSize } from '@/hooks/use-grid-page-size';
 
@@ -14,17 +14,22 @@ const GROUP_CARD_HEIGHT = 280;
 export function Group() {
     const { data: groups } = useGroupList();
     const pageKey = 'group' as const;
-    const pageSize = useGridPageSize({
+    const autoPageSize = useGridPageSize({
         itemHeight: GROUP_CARD_HEIGHT,
         gap: 16,
         columns: { default: 1, md: 2, lg: 3 },
     });
     const searchTerm = useSearchStore((s) => s.getSearchTerm(pageKey));
     const page = usePaginationStore((s) => s.getPage(pageKey));
+    const storedPageSize = usePaginationStore((s) => s.getPageSize(pageKey));
+    const isShowAll = usePaginationStore((s) => s.isShowAll(pageKey));
     const setPage = usePaginationStore((s) => s.setPage);
     const setTotalItems = usePaginationStore((s) => s.setTotalItems);
     const setPageSize = usePaginationStore((s) => s.setPageSize);
     const direction = usePaginationStore((s) => s.getDirection(pageKey));
+    
+    // 使用存储的 pageSize，如果是"显示全部"则使用 SHOW_ALL_PAGE_SIZE
+    const pageSize = isShowAll ? SHOW_ALL_PAGE_SIZE : storedPageSize;
 
     const filteredGroups = useMemo(() => {
         if (!groups) return [];

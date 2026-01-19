@@ -15,7 +15,7 @@ import { CreateDialogContent as ChannelCreateContent } from '@/components/module
 import { CreateDialogContent as GroupCreateContent } from '@/components/modules/group/Create';
 import { CreateDialogContent as ModelCreateContent } from '@/components/modules/model/Create';
 import { useSearchStore } from './search-store';
-import { usePaginationStore } from './pagination-store';
+import { usePaginationStore, SHOW_ALL_PAGE_SIZE } from './pagination-store';
 import { useChannelList, syncSingleChannel } from '@/api/endpoints/channel';
 import { toast } from '@/components/common/Toast';
 import { useTranslations } from 'next-intl';
@@ -44,6 +44,10 @@ export function Toolbar() {
     const setSearchTerm = useSearchStore((s) => s.setSearchTerm);
     const page = usePaginationStore((s) => s.getPage(activeItem));
     const totalPages = usePaginationStore((s) => s.getTotalPages(activeItem));
+    const pageSize = usePaginationStore((s) => s.getPageSize(activeItem));
+    const setPageSize = usePaginationStore((s) => s.setPageSize);
+    const isShowAll = usePaginationStore((s) => s.isShowAll(activeItem));
+    const totalItems = usePaginationStore((s) => s.totalItems[activeItem] || 0);
     const prevPage = usePaginationStore((s) => s.prevPage);
     const nextPage = usePaginationStore((s) => s.nextPage);
     const setPage = usePaginationStore((s) => s.setPage);
@@ -53,6 +57,7 @@ export function Toolbar() {
     const { data: channelsData } = useChannelList();
     const queryClient = useQueryClient();
     const t = useTranslations('channel.batchSync');
+    const tCommon = useTranslations('common.pagination');
     
     // 同步进度对话框状态
     const [syncDialogOpen, setSyncDialogOpen] = useState(false);
@@ -192,7 +197,7 @@ export function Toolbar() {
                                 type="button"
                                 aria-label="Previous page"
                                 onClick={() => prevPage(activeItem)}
-                                disabled={page <= 1}
+                                disabled={page <= 1 || isShowAll}
                                 className="size-8 inline-flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:hover:text-muted-foreground"
                             >
                                 <ChevronLeft className="size-4" />
@@ -200,21 +205,33 @@ export function Toolbar() {
                             <button
                                 type="button"
                                 onClick={() => setPage(activeItem, 1)}
-                                className="px-2 text-sm tabular-nums text-muted-foreground hover:text-foreground"
+                                className="px-2 text-sm tabular-nums text-muted-foreground hover:text-foreground whitespace-nowrap"
                                 aria-label="Page indicator"
                                 title="Click to go to first page"
                             >
-                                {page}/{totalPages}
+                                {isShowAll ? tCommon('total', { count: totalItems }) : `${page}/${totalPages}`}
                             </button>
                             <button
                                 type="button"
                                 aria-label="Next page"
                                 onClick={() => nextPage(activeItem)}
-                                disabled={page >= totalPages}
+                                disabled={page >= totalPages || isShowAll}
                                 className="size-8 inline-flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:hover:text-muted-foreground"
                             >
                                 <ChevronRight className="size-4" />
                             </button>
+                            <div className="h-4 w-px bg-border mx-1" />
+                            <select
+                                value={pageSize}
+                                onChange={(e) => setPageSize(activeItem, Number(e.target.value))}
+                                className="h-full px-2 text-sm bg-transparent text-muted-foreground hover:text-foreground outline-none cursor-pointer"
+                                aria-label="Page size selector"
+                            >
+                                <option value={12}>12</option>
+                                <option value={24}>24</option>
+                                <option value={48}>48</option>
+                                <option value={SHOW_ALL_PAGE_SIZE}>{tCommon('all')}</option>
+                            </select>
                         </div>
 
                         {/* 批量同步按钮 - 仅在渠道页面显示 */}
@@ -265,4 +282,4 @@ export function Toolbar() {
 }
 
 export { useSearchStore } from './search-store';
-export { usePaginationStore } from './pagination-store';
+export { usePaginationStore, SHOW_ALL_PAGE_SIZE } from './pagination-store';

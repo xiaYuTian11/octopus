@@ -16,6 +16,7 @@ var channelCache = cache.New[int, model.Channel](16)
 var channelKeyCache = cache.New[int, model.ChannelKey](16)
 var channelKeyCacheNeedUpdate = make(map[int]struct{})
 var channelKeyCacheNeedUpdateLock sync.Mutex
+var channelCacheLock sync.Mutex // 保护 channelCache 的并发访问
 
 func ChannelList(ctx context.Context) ([]model.Channel, error) {
 	channels := make([]model.Channel, 0, channelCache.Len())
@@ -39,30 +40,48 @@ func ChannelCreate(channel *model.Channel, ctx context.Context) error {
 }
 
 // ChannelKeyUpdate 仅更新 ChannelKey 的内存缓存（不落库），并标记为需要在 SaveCache 时写入数据库。
+// 使用锁保护缓存更新过程，确保原子性
 func ChannelKeyUpdate(key model.ChannelKey) error {
 	if key.ID == 0 || key.ChannelID == 0 {
 		return fmt.Errorf("invalid channel key")
 	}
+
+	// 加锁保护整个缓存更新过程，防止 read-modify-write 竞态
+	channelCacheLock.Lock()
+	defer channelCacheLock.Unlock()
+
 	ch, ok := channelCache.Get(key.ChannelID)
 	if !ok {
 		return fmt.Errorf("channel not found")
 	}
+
+	// 创建深拷贝以避免修改共享数据
 	if len(ch.Keys) > 0 {
 		keys := make([]model.ChannelKey, len(ch.Keys))
 		copy(keys, ch.Keys)
+		keyFound := false
 		for i := range keys {
 			if keys[i].ID == key.ID {
 				keys[i] = key
+				keyFound = true
 				break
 			}
 		}
+		if !keyFound {
+			return fmt.Errorf("channel key %d not found in channel %d", key.ID, key.ChannelID)
+		}
 		ch.Keys = keys
 	}
+
+	// 原子性地更新所有相关缓存
 	channelCache.Set(key.ChannelID, ch)
 	channelKeyCache.Set(key.ID, key)
+
+	// 标记需要更新到数据库
 	channelKeyCacheNeedUpdateLock.Lock()
 	channelKeyCacheNeedUpdate[key.ID] = struct{}{}
 	channelKeyCacheNeedUpdateLock.Unlock()
+
 	return nil
 }
 func ChannelBaseUrlUpdate(channelID int, baseUrl []model.BaseUrl) error {
@@ -301,6 +320,7 @@ func ChannelDel(id int, ctx context.Context) error {
 		return fmt.Errorf("failed to delete channel: %w", err)
 	}
 
+	// 提交事务
 	if err := tx.Commit().Error; err != nil {
 		return fmt.Errorf("failed to commit transaction: %w", err)
 	}
@@ -315,10 +335,18 @@ func ChannelDel(id int, ctx context.Context) error {
 	StatsChannelDel(id)
 
 	// 刷新受影响的分组缓存
+	// 收集所有刷新错误，但不影响删除操作的成功
+	var refreshErrors []error
 	for _, groupID := range affectedGroupIDs {
 		if err := groupRefreshCacheByID(groupID, ctx); err != nil {
+			refreshErrors = append(refreshErrors, fmt.Errorf("group %d: %w", groupID, err))
 			log.Warnf("failed to refresh group cache for group %d: %v", groupID, err)
 		}
+	}
+
+	// 如果有刷新错误，记录但不返回错误（因为删除操作已成功）
+	if len(refreshErrors) > 0 {
+		log.Warnf("channel %d deleted successfully, but some group caches failed to refresh: %v", id, refreshErrors)
 	}
 
 	return nil

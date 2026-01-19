@@ -81,6 +81,8 @@ func notifySubscribers(relayLog model.RelayLog) {
 	}
 }
 
+// relayLogFlushToDB 将日志缓存批量写入数据库
+// 改进锁的使用和切片操作的安全性，防止数据竞争
 func relayLogFlushToDB(ctx context.Context) error {
 	relayLogFlushLock.Lock()
 	defer relayLogFlushLock.Unlock()
@@ -90,26 +92,24 @@ func relayLogFlushToDB(ctx context.Context) error {
 		relayLogCacheLock.Unlock()
 		return nil
 	}
+
+	// 创建副本并清空原缓存，避免在数据库写入期间持有锁
 	batch := make([]model.RelayLog, len(relayLogCache))
 	copy(batch, relayLogCache)
-	flushedUpto := len(batch)
+	relayLogCache = make([]model.RelayLog, 0, relayLogMaxSize)
 	relayLogCacheLock.Unlock()
 
-	result := db.GetDB().WithContext(ctx).Create(&batch)
-	if result.Error != nil {
-		return result.Error
-	}
+	// 批量写入数据库
+	if err := db.GetDB().WithContext(ctx).Create(&batch).Error; err != nil {
+		log.Errorf("failed to flush relay logs to database: %v", err)
 
-	relayLogCacheLock.Lock()
-	if len(relayLogCache) >= flushedUpto {
-		relayLogCache = relayLogCache[flushedUpto:]
-	} else {
-		relayLogCache = relayLogCache[:0]
+		// 写入失败，尝试恢复数据到缓存前面
+		relayLogCacheLock.Lock()
+		relayLogCache = append(batch, relayLogCache...)
+		relayLogCacheLock.Unlock()
+
+		return err
 	}
-	if len(relayLogCache) == 0 {
-		relayLogCache = make([]model.RelayLog, 0, relayLogMaxSize)
-	}
-	relayLogCacheLock.Unlock()
 
 	return nil
 }

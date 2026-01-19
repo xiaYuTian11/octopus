@@ -75,6 +75,11 @@
             "success": "Copied",
             "failed": "Copy failed",
             "noContent": "Nothing to copy"
+        },
+        "pagination": {
+            "all": "All",
+            "showAll": "Show All",
+            "total": "Total {count}"
         }
     },
     "home": {
