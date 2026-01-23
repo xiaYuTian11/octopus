@@ -49,85 +49,108 @@ func Handler(inboundType inbound.InboundType, c *gin.Context) {
 		return
 	}
 
-	const maxRounds = 3
+	// 使用 map 记录已尝试的渠道，避免重复尝试
 	var lastErr error
 	itemCount := len(group.Items)
+	attemptedChannels := make(map[int]bool, itemCount)
 	b := balancer.GetBalancer(group.Mode)
-	for round := 0; round < maxRounds; round++ {
+
+	// 最多尝试渠道数的2倍(允许负载均衡器有一定的随机性)
+	// 但一旦所有渠道都尝试过就立即退出
+	maxAttempts := itemCount * 2
+	if maxAttempts < 1 {
+		maxAttempts = 1
+	}
+
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		select {
+		case <-c.Request.Context().Done():
+			log.Infof("request context canceled, stopping retry")
+			return
+		default:
+		}
+
 		item := b.Select(group.Items)
 		if item == nil {
 			resp.Error(c, http.StatusServiceUnavailable, "no available channel")
 			return
 		}
 
-		for i := 0; i < itemCount; i++ {
-			select {
-			case <-c.Request.Context().Done():
-				log.Infof("request context canceled, stopping retry")
-				return
-			default:
+		// 检查是否已尝试过此渠道
+		if attemptedChannels[item.ChannelID] {
+			// 如果所有渠道都已尝试过，退出循环
+			if len(attemptedChannels) >= itemCount {
+				log.Infof("All %d channels have been attempted, stopping retry", itemCount)
+				break
 			}
+			// 否则继续尝试获取下一个渠道
+			continue
+		}
 
-			channel, err := op.ChannelGet(item.ChannelID, c.Request.Context())
-			if err != nil {
-				log.Warnf("failed to get channel: %v", err)
-				lastErr = err
-				item = b.Next(group.Items, item)
-				continue
-			}
-			if channel.Enabled == false {
-				log.Warnf("channel %s is disabled", channel.Name)
-				lastErr = fmt.Errorf("channel %s is disabled", channel.Name)
-				item = b.Next(group.Items, item)
-				continue
-			}
+		// 标记此渠道已尝试
+		attemptedChannels[item.ChannelID] = true
 
-			log.Infof("request model %s, mode: %d, forwarding to channel: %s model: %s (round %d/%d, item %d/%d)", internalRequest.Model, group.Mode, channel.Name, item.ModelName, round+1, maxRounds, i+1, itemCount)
+		channel, err := op.ChannelGet(item.ChannelID, c.Request.Context())
+		if err != nil {
+			log.Warnf("failed to get channel %d: %v (attempt %d/%d, tried %d/%d channels)",
+				item.ChannelID, err, attempt+1, maxAttempts, len(attemptedChannels), itemCount)
+			lastErr = err
+			continue
+		}
+		if channel.Enabled == false {
+			log.Warnf("channel %s is disabled (attempt %d/%d, tried %d/%d channels)",
+				channel.Name, attempt+1, maxAttempts, len(attemptedChannels), itemCount)
+			lastErr = fmt.Errorf("channel %s is disabled", channel.Name)
+			continue
+		}
 
-			internalRequest.Model = item.ModelName
-			metrics.SetChannel(channel.ID, channel.Name, item.ModelName)
+		log.Infof("request model %s, mode: %d, forwarding to channel: %s model: %s (attempt %d/%d, tried %d/%d channels)",
+			internalRequest.Model, group.Mode, channel.Name, item.ModelName, attempt+1, maxAttempts, len(attemptedChannels), itemCount)
 
-			outAdapter := outbound.Get(channel.Type)
-			if outAdapter == nil {
-				log.Warnf("unsupported channel type: %d for channel: %s", channel.Type, channel.Name)
-				lastErr = fmt.Errorf("unsupported channel type: %d", channel.Type)
-				item = b.Next(group.Items, item)
-				continue
-			}
+		internalRequest.Model = item.ModelName
+		metrics.SetChannel(channel.ID, channel.Name, item.ModelName)
 
-			rc := &relayContext{
-				c:                    c,
-				inAdapter:            inAdapter,
-				outAdapter:           outAdapter,
-				internalRequest:      internalRequest,
-				channel:              channel,
-				metrics:              metrics,
-				usedKey:              channel.GetChannelKey(),
-				firstTokenTimeOutSec: group.FirstTokenTimeOut,
-				validator:            NewResponseValidator(),
-			}
+		outAdapter := outbound.Get(channel.Type)
+		if outAdapter == nil {
+			log.Warnf("unsupported channel type: %d for channel: %s (attempt %d/%d, tried %d/%d channels)",
+				channel.Type, channel.Name, attempt+1, maxAttempts, len(attemptedChannels), itemCount)
+			lastErr = fmt.Errorf("unsupported channel type: %d", channel.Type)
+			continue
+		}
 
-			if statusCode, err := rc.forward(); err == nil {
+		rc := &relayContext{
+			c:                    c,
+			inAdapter:            inAdapter,
+			outAdapter:           outAdapter,
+			internalRequest:      internalRequest,
+			channel:              channel,
+			metrics:              metrics,
+			usedKey:              channel.GetChannelKey(),
+			firstTokenTimeOutSec: group.FirstTokenTimeOut,
+			validator:            NewResponseValidator(),
+		}
+
+		if statusCode, err := rc.forward(); err == nil {
+			rc.collectResponse()
+			rc.usedKey.StatusCode = statusCode
+			rc.usedKey.LastUseTimeStamp = time.Now().Unix()
+			rc.usedKey.TotalCost += metrics.Stats.InputCost + metrics.Stats.OutputCost
+			op.ChannelKeyUpdate(rc.usedKey)
+			metrics.Save(c.Request.Context(), true, nil)
+			return
+		} else {
+			rc.usedKey.StatusCode = statusCode
+			rc.usedKey.LastUseTimeStamp = time.Now().Unix()
+			op.ChannelKeyUpdate(rc.usedKey)
+			if c.Writer.Written() {
+				// Streaming responses may have already started; retrying would corrupt the client stream.
 				rc.collectResponse()
-				rc.usedKey.StatusCode = statusCode
-				rc.usedKey.LastUseTimeStamp = time.Now().Unix()
-				rc.usedKey.TotalCost += metrics.Stats.InputCost + metrics.Stats.OutputCost
-				op.ChannelKeyUpdate(rc.usedKey)
-				metrics.Save(c.Request.Context(), true, nil)
+				metrics.Save(c.Request.Context(), false, err)
 				return
-			} else {
-				rc.usedKey.StatusCode = statusCode
-				rc.usedKey.LastUseTimeStamp = time.Now().Unix()
-				op.ChannelKeyUpdate(rc.usedKey)
-				if c.Writer.Written() {
-					// Streaming responses may have already started; retrying would corrupt the client stream.
-					rc.collectResponse()
-					metrics.Save(c.Request.Context(), false, err)
-					return
-				}
-				lastErr = fmt.Errorf("channel %s failed: %v", channel.Name, err)
 			}
-			item = b.Next(group.Items, item)
+			log.Warnf("channel %s failed: %v (attempt %d/%d, tried %d/%d channels)",
+				channel.Name, err, attempt+1, maxAttempts, len(attemptedChannels), itemCount)
+			lastErr = fmt.Errorf("channel %s failed: %v", channel.Name, err)
 		}
 	}
 
