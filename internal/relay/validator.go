@@ -57,6 +57,15 @@ func (v *ResponseValidator) ValidateStreamChunk(chunk *model.InternalLLMResponse
 
 	v.chunkCount++
 
+	// 在流式响应的早期阶段检测空响应
+	// 如果前几个块都是空的,可能是空响应
+	if v.chunkCount <= 3 {
+		if err := v.ValidateEmptyResponse(chunk); err != nil {
+			log.Warnf("Empty stream chunk detected in early stage (chunk %d): %v", v.chunkCount, err)
+			return err
+		}
+	}
+
 	for _, choice := range chunk.Choices {
 		if choice.Delta != nil && choice.Delta.Content.Content != nil {
 			content := *choice.Delta.Content.Content
@@ -70,6 +79,82 @@ func (v *ResponseValidator) ValidateStreamChunk(chunk *model.InternalLLMResponse
 					return err
 				}
 			}
+		}
+	}
+
+	return nil
+}
+
+// ValidateEmptyResponse 检测空响应
+// 空响应的特征:
+// 1. choices 数组为空
+// 2. completion_tokens 为 0
+// 3. 所有 choice 的内容都为空
+func (v *ResponseValidator) ValidateEmptyResponse(response *model.InternalLLMResponse) error {
+	if response == nil {
+		return nil
+	}
+
+	// 检查 choices 是否为空
+	if len(response.Choices) == 0 {
+		log.Warnf("Empty response detected: choices array is empty")
+		return &ResponseQualityError{
+			Reason: "empty_response",
+			Detail: "choices array is empty",
+		}
+	}
+
+	// 检查 completion_tokens 是否为 0
+	if response.Usage != nil && response.Usage.CompletionTokens == 0 {
+		log.Warnf("Empty response detected: completion_tokens is 0")
+		return &ResponseQualityError{
+			Reason: "empty_response",
+			Detail: "completion_tokens is 0",
+		}
+	}
+
+	// 检查所有 choice 的内容是否都为空
+	allEmpty := true
+	for _, choice := range response.Choices {
+		var hasContent bool
+
+		// 检查 Message 内容
+		if choice.Message != nil {
+			if choice.Message.Content.Content != nil && *choice.Message.Content.Content != "" {
+				hasContent = true
+			}
+			if len(choice.Message.Content.MultipleContent) > 0 {
+				hasContent = true
+			}
+			if len(choice.Message.ToolCalls) > 0 {
+				hasContent = true
+			}
+		}
+
+		// 检查 Delta 内容
+		if choice.Delta != nil {
+			if choice.Delta.Content.Content != nil && *choice.Delta.Content.Content != "" {
+				hasContent = true
+			}
+			if len(choice.Delta.Content.MultipleContent) > 0 {
+				hasContent = true
+			}
+			if len(choice.Delta.ToolCalls) > 0 {
+				hasContent = true
+			}
+		}
+
+		if hasContent {
+			allEmpty = false
+			break
+		}
+	}
+
+	if allEmpty {
+		log.Warnf("Empty response detected: all choices have empty content")
+		return &ResponseQualityError{
+			Reason: "empty_response",
+			Detail: "all choices have empty content",
 		}
 	}
 

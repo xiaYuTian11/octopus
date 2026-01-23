@@ -8,9 +8,14 @@ import (
 	"github.com/bestruirui/octopus/internal/db"
 	"github.com/bestruirui/octopus/internal/model"
 	"github.com/bestruirui/octopus/internal/utils/cache"
+	"gorm.io/gorm/clause"
 )
 
 var llmModelCache = cache.New[string, model.LLMPrice](16)
+
+func normalizeModelName(name string) string {
+	return strings.ToLower(strings.TrimSpace(name))
+}
 
 func LLMList(ctx context.Context) ([]model.LLMInfo, error) {
 	models := make([]model.LLMInfo, 0, llmModelCache.Len())
@@ -24,6 +29,10 @@ func LLMList(ctx context.Context) ([]model.LLMInfo, error) {
 }
 
 func LLMUpdate(model model.LLMInfo, ctx context.Context) error {
+	model.Name = normalizeModelName(model.Name)
+	if model.Name == "" {
+		return fmt.Errorf("model name is empty")
+	}
 	_, ok := llmModelCache.Get(model.Name)
 	if !ok {
 		return fmt.Errorf("model not found")
@@ -50,14 +59,28 @@ func LLMBatchDelete(modelNames []string, ctx context.Context) error {
 	if len(modelNames) == 0 {
 		return nil
 	}
-	if err := db.GetDB().WithContext(ctx).Where("name IN ?", modelNames).Delete(&model.LLMInfo{}).Error; err != nil {
+	normalizedNames := make([]string, 0, len(modelNames))
+	for _, name := range modelNames {
+		name = normalizeModelName(name)
+		if name == "" {
+			continue
+		}
+		normalizedNames = append(normalizedNames, name)
+	}
+	if len(normalizedNames) == 0 {
+		return nil
+	}
+	if err := db.GetDB().WithContext(ctx).Where("name IN ?", normalizedNames).Delete(&model.LLMInfo{}).Error; err != nil {
 		return err
 	}
-	llmModelCache.Del(modelNames...)
+	llmModelCache.Del(normalizedNames...)
 	return nil
 }
 func LLMCreate(model model.LLMInfo, ctx context.Context) error {
-	model.Name = strings.ToLower(model.Name)
+	model.Name = normalizeModelName(model.Name)
+	if model.Name == "" {
+		return fmt.Errorf("model name is empty")
+	}
 	_, ok := llmModelCache.Get(model.Name)
 	if ok {
 		return fmt.Errorf("model already exists")
@@ -75,7 +98,10 @@ func LLMBatchCreate(llmInfos []model.LLMInfo, ctx context.Context) error {
 	seen := make(map[string]struct{}, len(llmInfos))
 	newLLMInfos := make([]model.LLMInfo, 0, len(llmInfos))
 	for _, llmInfo := range llmInfos {
-		llmInfo.Name = strings.ToLower(llmInfo.Name)
+		llmInfo.Name = normalizeModelName(llmInfo.Name)
+		if llmInfo.Name == "" {
+			continue
+		}
 		if _, ok := seen[llmInfo.Name]; ok {
 			continue
 		}
@@ -88,7 +114,7 @@ func LLMBatchCreate(llmInfos []model.LLMInfo, ctx context.Context) error {
 	if len(newLLMInfos) == 0 {
 		return nil
 	}
-	if err := db.GetDB().WithContext(ctx).Create(&newLLMInfos).Error; err != nil {
+	if err := db.GetDB().WithContext(ctx).Clauses(clause.OnConflict{DoNothing: true}).Create(&newLLMInfos).Error; err != nil {
 		return err
 	}
 	for _, llmInfo := range newLLMInfos {
@@ -97,6 +123,10 @@ func LLMBatchCreate(llmInfos []model.LLMInfo, ctx context.Context) error {
 	return nil
 }
 func LLMGet(name string) (model.LLMPrice, error) {
+	name = normalizeModelName(name)
+	if name == "" {
+		return model.LLMPrice{}, fmt.Errorf("model not found")
+	}
 	price, ok := llmModelCache.Get(name)
 	if !ok {
 		return model.LLMPrice{}, fmt.Errorf("model not found")
@@ -110,7 +140,11 @@ func llmRefreshCache(ctx context.Context) error {
 		return err
 	}
 	for _, model := range models {
-		llmModelCache.Set(model.Name, model.LLMPrice)
+		name := normalizeModelName(model.Name)
+		if name == "" {
+			continue
+		}
+		llmModelCache.Set(name, model.LLMPrice)
 	}
 	return nil
 }

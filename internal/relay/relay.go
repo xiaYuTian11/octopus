@@ -133,7 +133,15 @@ func Handler(inboundType inbound.InboundType, c *gin.Context) {
 
 	// 所有通道都失败
 	metrics.Save(c.Request.Context(), false, lastErr)
-	resp.Error(c, http.StatusBadGateway, "all channels failed")
+
+	// 根据错误类型提供更明确的错误消息
+	errorMsg := "all channels failed"
+	if lastErr != nil && IsResponseQualityError(lastErr) {
+		errorMsg = "all channels returned empty or invalid responses"
+		log.Warnf("All channels failed with quality issues: %v", lastErr)
+	}
+
+	resp.Error(c, http.StatusBadGateway, errorMsg)
 }
 
 // parseRequest 解析并验证入站请求
@@ -405,6 +413,13 @@ func (rc *relayContext) handleResponse(ctx context.Context, response *http.Respo
 
 	// 验证响应质量
 	if rc.validator != nil {
+		// 先检测空响应
+		if err := rc.validator.ValidateEmptyResponse(internalResponse); err != nil {
+			log.Warnf("empty response detected: %v", err)
+			return fmt.Errorf("empty response detected: %w", err)
+		}
+
+		// 再检测其他质量问题
 		if err := rc.validator.ValidateResponse(internalResponse); err != nil {
 			log.Warnf("response validation failed: %v", err)
 			return fmt.Errorf("response validation failed: %w", err)
