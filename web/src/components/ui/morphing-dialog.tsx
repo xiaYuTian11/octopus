@@ -59,7 +59,7 @@ function MorphingDialogProvider({
   const uniqueId = useId();
   const triggerRef = useRef<HTMLDivElement>(null!);
   const prefersReducedMotion = useReducedMotion();
-  const reduceMotion = forceReduceMotion ?? prefersReducedMotion;
+  const reduceMotion = forceReduceMotion ?? !!prefersReducedMotion;
   const disableLayoutAnimation = reduceMotion;
 
   const contextValue = useMemo(
