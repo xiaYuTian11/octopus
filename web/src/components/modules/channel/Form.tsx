@@ -154,6 +154,7 @@ export function ChannelForm({
                 keys: keysForFetch,
                 proxy: formData.proxy,
                 match_regex: formData.match_regex.trim() || null,
+                enabled: true, // 确保后端按可用渠道流程获取模型
             },
             {
                 onSuccess: (data) => {
