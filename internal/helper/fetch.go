@@ -29,8 +29,9 @@ func setBrowserHeaders(req *http.Request) {
 }
 
 func FetchModels(ctx context.Context, request model.Channel) ([]string, error) {
+	// 允许前端测试/刷新模型时强制启用（即使持久化状态为禁用）。
 	if !request.Enabled {
-		return nil, fmt.Errorf("channel %s is disabled", request.Name)
+		request.Enabled = true
 	}
 	key, err := op.ChannelSelectKey(ctx, &request)
 	if err != nil || key.ChannelKey == "" {
