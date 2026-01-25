@@ -1,4 +1,4 @@
-import { AutoGroupType, ChannelType, type Channel, useFetchModel } from '@/api/endpoints/channel';
+import { AutoGroupType, ChannelType, type Channel, useChannelKeys, useFetchModel } from '@/api/endpoints/channel';
 import {
     Select,
     SelectContent,
@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/components/common/Toast';
 import { useTranslations } from 'next-intl';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshCw, X, Plus, ExternalLink } from 'lucide-react';
 import { useNavStore } from '@/components/modules/navbar';
 
@@ -47,6 +47,7 @@ export interface ChannelFormData {
 
 export interface ChannelFormProps {
     formData: ChannelFormData;
+    channelId?: number;
     onFormDataChange: (data: ChannelFormData) => void;
     onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
     isPending: boolean;
@@ -55,6 +56,7 @@ export interface ChannelFormProps {
     onCancel?: () => void;
     cancelText?: string;
     idPrefix?: string;
+    onNavigateToKeyPool?: () => void;
 }
 
 import {
@@ -67,6 +69,7 @@ import {
 export function ChannelForm({
     formData,
     onFormDataChange,
+    channelId,
     onSubmit,
     isPending,
     submitText,
@@ -74,6 +77,7 @@ export function ChannelForm({
     onCancel,
     cancelText,
     idPrefix = 'channel',
+    onNavigateToKeyPool,
 }: ChannelFormProps) {
     const t = useTranslations('channel.form');
     const { setActiveItem } = useNavStore();
@@ -105,8 +109,28 @@ export function ChannelForm({
 
     const fetchModel = useFetchModel();
 
-    const effectiveKey =
+    const manualEffectiveKey =
         formData.keys.find((k) => k.enabled && k.channel_key.trim())?.channel_key.trim() || '';
+
+    // 当启用密钥池且表单中没有可用 Key 时，尝试从密钥池里取一个可用 Key 用来刷新模型
+    const shouldLoadPoolKey = formData.key_pool_enabled && !!channelId && !manualEffectiveKey;
+    const poolKeyQuery = useChannelKeys({
+        channel_id: shouldLoadPoolKey ? channelId : undefined,
+        page: 1,
+        page_size: 50, // 多取一些，优先找出最近成功的可用 Key
+        enabled: true,
+    });
+
+    const poolEffectiveKey = useMemo(() => {
+        if (!shouldLoadPoolKey) return '';
+        const items = poolKeyQuery.data?.items ?? [];
+        const successKey = items.find((k) => k.enabled && k.channel_key.trim() && k.status_code === 200);
+        if (successKey) return successKey.channel_key.trim();
+        const firstEnabled = items.find((k) => k.enabled && k.channel_key.trim());
+        return firstEnabled ? firstEnabled.channel_key.trim() : '';
+    }, [poolKeyQuery.data?.items, shouldLoadPoolKey]);
+
+    const effectiveKey = manualEffectiveKey || poolEffectiveKey;
 
     const updateModels = (nextAuto: string[], nextCustom: string[]) => {
         const model = nextAuto.join(',');
@@ -117,13 +141,17 @@ export function ChannelForm({
 
     const handleRefreshModels = async () => {
         if (!formData.base_urls?.[0]?.url || !effectiveKey) return;
+        const keysForFetch = formData.keys
+            .filter((k) => k.channel_key.trim())
+            .map((k) => ({ enabled: k.enabled, channel_key: k.channel_key.trim() }));
+        if (keysForFetch.length === 0 && poolEffectiveKey) {
+            keysForFetch.push({ enabled: true, channel_key: poolEffectiveKey });
+        }
         fetchModel.mutate(
             {
                 type: formData.type,
                 base_urls: formData.base_urls,
-                keys: formData.keys
-                    .filter((k) => k.channel_key.trim())
-                    .map((k) => ({ enabled: k.enabled, channel_key: k.channel_key.trim() })),
+                keys: keysForFetch,
                 proxy: formData.proxy,
                 match_regex: formData.match_regex.trim() || null,
             },
@@ -264,11 +292,11 @@ export function ChannelForm({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex items-center justify-between rounded-xl border p-3 bg-muted/30">
-                    <div>
-                        <div className="text-sm font-medium text-card-foreground">{t('keyPool')}</div>
-                        <div className="text-xs text-muted-foreground">{t('keyPoolDesc')}</div>
-                    </div>
+                    <div className="flex items-center justify-between rounded-xl border p-3 bg-muted/30">
+                        <div>
+                            <div className="text-sm font-medium text-card-foreground">{t('keyPool')}</div>
+                            <div className="text-xs text-muted-foreground">{t('keyPoolDesc')}</div>
+                        </div>
                     <Switch
                         checked={formData.key_pool_enabled}
                         onCheckedChange={(checked) => onFormDataChange({ ...formData, key_pool_enabled: checked })}
@@ -335,23 +363,29 @@ export function ChannelForm({
             </div>
 
         {formData.key_pool_enabled ? (
-            <div className="space-y-2 rounded-2xl border bg-muted/20 p-3">
-                <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                        <div className="text-sm font-medium text-card-foreground">{t('apiKey')}</div>
-                        <div className="text-xs text-muted-foreground">{t('keyPoolDesc')}</div>
-                    </div>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="rounded-xl"
-                        onClick={() => setActiveItem('keypool')}
-                    >
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        {t('keyPool')}
-                    </Button>
-                </div>
+                    <div className="space-y-2 rounded-2xl border bg-muted/20 p-3">
+                        <div className="flex items-center justify-between">
+                            <div className="space-y-1">
+                                <div className="text-sm font-medium text-card-foreground">{t('apiKey')}</div>
+                                <div className="text-xs text-muted-foreground">{t('keyPoolDesc')}</div>
+                            </div>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="rounded-xl"
+                                onClick={() => {
+                                    if (onNavigateToKeyPool) {
+                                        onNavigateToKeyPool();
+                                    } else {
+                                        setActiveItem('keypool');
+                                    }
+                                }}
+                            >
+                                <ExternalLink className="h-4 w-4 mr-2" />
+                                {t('keyPool')}
+                            </Button>
+                        </div>
                 <div className="text-xs text-muted-foreground">
                     {t('keyPool')}：{formData.keys.length > 0 ? `${formData.keys.length} ${t('apiKey')}` : t('keyPoolDesc')}
                     <div>{t('keyPoolTools')}</div>

@@ -27,9 +27,11 @@ import { formatMoney } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { toast } from '@/components/common/Toast';
+import { useNavStore } from '@/components/modules/navbar';
 
 export function CardContent({ channel, stats }: { channel: Channel; stats: StatsMetricsFormatted }) {
     const { setIsOpen } = useMorphingDialog();
+    const { setActiveItem } = useNavStore();
     const updateChannel = useUpdateChannel();
     const deleteChannel = useDeleteChannel();
     const importKeys = useImportChannelKeys();
@@ -547,6 +549,7 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                             )}
                             <ChannelForm
                                 formData={formData}
+                                channelId={channel.id}
                                 onFormDataChange={setFormData}
                                 onSubmit={handleUpdate}
                                 isPending={updateChannel.isPending}
@@ -555,6 +558,11 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                                 onCancel={() => setIsEditing(false)}
                                 cancelText={t('actions.cancel')}
                                 idPrefix="channel"
+                                onNavigateToKeyPool={() => {
+                                    setIsOpen(false);
+                                    // 先关闭弹窗再跳转，避免遮罩阻塞交互
+                                    setTimeout(() => setActiveItem('keypool'), 150);
+                                }}
                             />
                         </TabsContent>
                     </TabsContents>
