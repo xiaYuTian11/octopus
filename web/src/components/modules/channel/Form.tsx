@@ -158,6 +158,7 @@ export function ChannelForm({
                 keys: keysForFetch,
                 proxy: formData.proxy,
                 match_regex: formData.match_regex.trim() || null,
+                enabled: true,
             },
             {
                 onSuccess: (data) => {

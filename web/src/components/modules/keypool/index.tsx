@@ -42,7 +42,8 @@ export function KeyPool() {
         totalBatches: number;
         added: number;
         skipped: number;
-    }>({ active: false, currentBatch: 0, totalBatches: 0, added: 0, skipped: 0 });
+        dedupSkipped: number;
+    }>({ active: false, currentBatch: 0, totalBatches: 0, added: 0, skipped: 0, dedupSkipped: 0 });
     const fileInputRef = useRef<HTMLInputElement | null>(null);
 
     const importKeys = useImportChannelKeys();
@@ -95,20 +96,23 @@ export function KeyPool() {
             return;
         }
 
-        const totalBatches = Math.ceil(lines.length / CHUNK_SIZE);
-        setImportStatus({ active: true, currentBatch: 0, totalBatches, added: 0, skipped: 0 });
+        const uniqueLines = Array.from(new Set(lines));
+        const dedupSkipped = lines.length - uniqueLines.length;
+
+        const totalBatches = Math.ceil(uniqueLines.length / CHUNK_SIZE);
+        setImportStatus({ active: true, currentBatch: 0, totalBatches, added: 0, skipped: 0, dedupSkipped });
 
         let added = 0;
         let skipped = 0;
         try {
             for (let i = 0; i < totalBatches; i++) {
-                const chunk = lines.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE).join('\n');
+                const chunk = uniqueLines.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE).join('\n');
                 const res = await importKeys.mutateAsync({ channel_id: selectedChannelId!, text: chunk });
                 added += res.added ?? 0;
                 skipped += res.skipped ?? 0;
-                setImportStatus({ active: true, currentBatch: i + 1, totalBatches, added, skipped });
+                setImportStatus({ active: true, currentBatch: i + 1, totalBatches, added, skipped, dedupSkipped });
             }
-            const msg = t('importSuccess', { added, skipped });
+            const msg = t('importSuccess', { added, skipped: skipped + dedupSkipped });
             toast.success(msg);
             setLastMessage(msg);
             setText('');
@@ -118,7 +122,7 @@ export function KeyPool() {
             const message = error instanceof Error ? error.message : 'Import failed';
             toast.error(message);
         } finally {
-            setImportStatus({ active: false, currentBatch: 0, totalBatches: 0, added: 0, skipped: 0 });
+            setImportStatus({ active: false, currentBatch: 0, totalBatches: 0, added: 0, skipped: 0, dedupSkipped: 0 });
         }
     };
 
@@ -311,7 +315,7 @@ export function KeyPool() {
                             <div className="text-sm text-muted-foreground flex items-center gap-2">
                                 <Loader2 className="h-4 w-4 animate-spin" />
                                 {importStatus.active && importStatus.totalBatches > 0
-                                    ? `导入中 ${importStatus.currentBatch}/${importStatus.totalBatches}，新增 ${importStatus.added}，跳过 ${importStatus.skipped}`
+                                    ? `导入中 ${importStatus.currentBatch}/${importStatus.totalBatches}，新增 ${importStatus.added}，跳过 ${importStatus.skipped}，去重 ${importStatus.dedupSkipped}`
                                     : tActions('saving')}
                             </div>
                         )}

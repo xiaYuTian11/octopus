@@ -136,6 +136,7 @@ export type FetchModelRequest = {
     keys: Array<Pick<ChannelKey, 'enabled' | 'channel_key'>>;
     proxy?: boolean;
     match_regex?: string | null;
+    enabled?: boolean;
 };
 
 /**
