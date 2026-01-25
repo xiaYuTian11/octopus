@@ -23,8 +23,32 @@ var channelCacheLock sync.Mutex // 保护 channelCache 的并发访问
 
 func ChannelList(ctx context.Context) ([]model.Channel, error) {
 	channels := make([]model.Channel, 0, channelCache.Len())
+
+	// 预聚合 key 统计，避免逐渠道 count.
+	type keyAgg struct {
+		ChannelID int64
+		Total     int64
+		Enabled   int64
+	}
+	keyAggs := []keyAgg{}
+	_ = db.GetDB().WithContext(ctx).
+		Model(&model.ChannelKey{}).
+		Select("channel_id, COUNT(*) as total, SUM(CASE WHEN enabled THEN 1 ELSE 0 END) as enabled").
+		Group("channel_id").
+		Find(&keyAggs).Error
+	keyMap := make(map[int64]keyAgg, len(keyAggs))
+	for _, ka := range keyAggs {
+		keyMap[ka.ChannelID] = ka
+	}
+
 	for _, channel := range channelCache.GetAll() {
-		channels = append(channels, channel)
+		ch := channel
+		if agg, ok := keyMap[int64(ch.ID)]; ok {
+			setKeyCountsFromAgg(&ch, agg.Total, agg.Enabled)
+		} else {
+			setKeyCountsFromKeys(&ch)
+		}
+		channels = append(channels, ch)
 	}
 	return channels, nil
 }
@@ -33,6 +57,7 @@ func ChannelCreate(channel *model.Channel, ctx context.Context) error {
 	if channel.KeyPoolEnabled && channel.KeyFailThreshold <= 0 {
 		channel.KeyFailThreshold = 3
 	}
+	setKeyCountsFromKeys(channel)
 	if err := db.GetDB().WithContext(ctx).Create(channel).Error; err != nil {
 		return err
 	}
@@ -560,6 +585,7 @@ func channelRefreshCacheByID(id int, ctx context.Context) error {
 		First(&channel, id).Error; err != nil {
 		return err
 	}
+	setKeyCountsFromKeys(&channel)
 	channelCache.Set(channel.ID, channel)
 	for _, k := range channel.Keys {
 		if k.ID != 0 {
@@ -567,4 +593,53 @@ func channelRefreshCacheByID(id int, ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+func setKeyCountsFromKeys(ch *model.Channel) {
+	total := len(ch.Keys)
+	enabled := 0
+	for _, k := range ch.Keys {
+		if k.Enabled {
+			enabled++
+		}
+	}
+	ch.KeyCount = total
+	ch.KeyEnabledCount = enabled
+	ch.KeyDisabledCount = total - enabled
+}
+
+func setKeyCountsFromAgg(ch *model.Channel, total int64, enabled int64) {
+	ch.KeyCount = int(total)
+	ch.KeyEnabledCount = int(enabled)
+	ch.KeyDisabledCount = int(total - enabled)
+}
+
+// ChannelKeysPage 返回分页后的密钥列表及总数，用于密钥池查看。
+func ChannelKeysPage(ctx context.Context, channelID int, page, pageSize int, enabled *bool) ([]model.ChannelKey, int64, error) {
+	if channelID <= 0 {
+		return nil, 0, fmt.Errorf("invalid channel_id")
+	}
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = 50
+	}
+	if pageSize > 200 {
+		pageSize = 200
+	}
+	dbConn := db.GetDB().WithContext(ctx)
+	query := dbConn.Model(&model.ChannelKey{}).Where("channel_id = ?", channelID)
+	if enabled != nil {
+		query = query.Where("enabled = ?", *enabled)
+	}
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	keys := []model.ChannelKey{}
+	if err := query.Order("id DESC").Limit(pageSize).Offset((page-1)*pageSize).Find(&keys).Error; err != nil {
+		return nil, 0, err
+	}
+	return keys, total, nil
 }

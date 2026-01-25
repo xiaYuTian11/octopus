@@ -50,6 +50,10 @@ func init() {
 				Handle(importChannelKeys),
 		).
 		AddRoute(
+			router.NewRoute("/keys/list", http.MethodPost).
+				Handle(listChannelKeys),
+		).
+		AddRoute(
 			router.NewRoute("/keys/restore-invalid", http.MethodPost).
 				Handle(restoreInvalidChannelKeys),
 		).
@@ -82,6 +86,10 @@ func listChannel(c *gin.Context) {
 	for i, channel := range channels {
 		stats := op.StatsChannelGet(channel.ID)
 		channels[i].Stats = &stats
+		// 避免密钥池渠道携带海量 keys 导致前端卡顿；前端有独立密钥池管理页。
+		if channel.KeyPoolEnabled {
+			channels[i].Keys = []model.ChannelKey{}
+		}
 	}
 	resp.Success(c, channels)
 }
@@ -98,6 +106,9 @@ func createChannel(c *gin.Context) {
 	}
 	stats := op.StatsChannelGet(channel.ID)
 	channel.Stats = &stats
+	if channel.KeyPoolEnabled {
+		channel.Keys = []model.ChannelKey{}
+	}
 	go func(channel *model.Channel) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer cancel()
@@ -123,6 +134,9 @@ func updateChannel(c *gin.Context) {
 	}
 	stats := op.StatsChannelGet(channel.ID)
 	channel.Stats = &stats
+	if channel.KeyPoolEnabled {
+		channel.Keys = []model.ChannelKey{}
+	}
 	go func(channel *model.Channel) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 		defer cancel()
@@ -170,6 +184,13 @@ type importKeysRequest struct {
 	Text      string `json:"text" binding:"required"`
 }
 
+type listKeysRequest struct {
+	ChannelID int   `json:"channel_id" binding:"required"`
+	Page      int   `json:"page"`
+	PageSize  int   `json:"page_size"`
+	Enabled   *bool `json:"enabled"`
+}
+
 func importChannelKeys(c *gin.Context) {
 	var req importKeysRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -184,6 +205,25 @@ func importChannelKeys(c *gin.Context) {
 	resp.Success(c, gin.H{
 		"added":   added,
 		"skipped": skipped,
+	})
+}
+
+func listChannelKeys(c *gin.Context) {
+	var req listKeysRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		resp.Error(c, http.StatusBadRequest, resp.ErrInvalidJSON)
+		return
+	}
+	keys, total, err := op.ChannelKeysPage(c.Request.Context(), req.ChannelID, req.Page, req.PageSize, req.Enabled)
+	if err != nil {
+		resp.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	resp.Success(c, gin.H{
+		"items":     keys,
+		"total":     total,
+		"page":      req.Page,
+		"page_size": req.PageSize,
 	})
 }
 

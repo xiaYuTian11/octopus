@@ -30,6 +30,9 @@ type Channel struct {
 	AutoGroup        AutoGroupType         `json:"auto_group" gorm:"default:0"`
 	KeyPoolEnabled   bool                  `json:"key_pool_enabled" gorm:"default:false"`
 	KeyFailThreshold int                   `json:"key_fail_threshold" gorm:"default:3"`
+	KeyCount         int                   `json:"key_count" gorm:"-"`
+	KeyEnabledCount  int                   `json:"key_enabled_count" gorm:"-"`
+	KeyDisabledCount int                   `json:"key_disabled_count" gorm:"-"`
 	CustomHeader     []CustomHeader        `json:"custom_header" gorm:"serializer:json"`
 	ParamOverride    *string               `json:"param_override"`
 	ChannelProxy     *string               `json:"channel_proxy"`

@@ -66,6 +66,9 @@ export type Channel = {
     custom_header: CustomHeader[];
     key_pool_enabled?: boolean;
     key_fail_threshold?: number;
+    key_count?: number;
+    key_enabled_count?: number;
+    key_disabled_count?: number;
     param_override?: string | null;
     channel_proxy?: string | null;
     match_regex?: string | null;
@@ -160,6 +163,11 @@ export function useChannelList() {
                 keys: item.keys ?? [],
                 key_pool_enabled: !!item.key_pool_enabled,
                 key_fail_threshold: item.key_fail_threshold ?? 3,
+                key_count: item.key_count ?? item.keys?.length ?? 0,
+                key_enabled_count: item.key_enabled_count ?? item.keys?.filter((k) => k.enabled)?.length ?? 0,
+                key_disabled_count:
+                    item.key_disabled_count ??
+                    (item.keys ? item.keys.length - item.keys.filter((k) => k.enabled).length : 0),
             }) satisfies Channel,
             formatted: {
                 input_token: formatCount(item.stats.input_token),
@@ -442,6 +450,33 @@ export function useClearInvalidChannelKeys() {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['channels', 'list'] });
         },
+    });
+}
+
+export type ChannelKeyPage = {
+    items: ChannelKey[];
+    total: number;
+    page: number;
+    page_size: number;
+};
+
+/**
+ * 分页获取渠道密钥
+ */
+export function useChannelKeys(params: { channel_id?: number; page: number; page_size: number; enabled?: boolean }) {
+    const { channel_id, page, page_size, enabled } = params;
+    return useQuery({
+        enabled: !!channel_id,
+        queryKey: ['channel', 'keys', channel_id, page, page_size, enabled],
+        queryFn: async () => {
+            return apiClient.post<ChannelKeyPage>('/api/v1/channel/keys/list', {
+                channel_id,
+                page,
+                page_size,
+                enabled,
+            });
+        },
+        staleTime: 10 * 1000,
     });
 }
 
