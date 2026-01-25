@@ -147,6 +147,10 @@ export function ChannelForm({
         if (keysForFetch.length === 0 && poolEffectiveKey) {
             keysForFetch.push({ enabled: true, channel_key: poolEffectiveKey });
         }
+        if (!formData.enabled) {
+            toast.error(t('modelRefreshFailed'), { description: '渠道未启用，请先启用后再刷新模型' });
+            return;
+        }
         fetchModel.mutate(
             {
                 type: formData.type,
@@ -154,7 +158,6 @@ export function ChannelForm({
                 keys: keysForFetch,
                 proxy: formData.proxy,
                 match_regex: formData.match_regex.trim() || null,
-                enabled: true, // 确保后端按可用渠道流程获取模型
             },
             {
                 onSuccess: (data) => {
