@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from '@/components/common/Toast';
 import { Button } from '@/components/ui/button';
@@ -14,11 +14,13 @@ import {
     useClearInvalidChannelKeys,
     useChannelKeys,
 } from '@/api/endpoints/channel';
-import { Loader2, RefreshCcw } from 'lucide-react';
+import { Loader2, RefreshCcw, Upload } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 const PAGE_SIZE = 50;
+const CHUNK_SIZE = 2000;
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
 export function KeyPool() {
     const { data: channels } = useChannelList();
@@ -26,12 +28,22 @@ export function KeyPool() {
     const t = useTranslations('channel.form');
     const tNav = useTranslations('navbar');
     const tActions = useTranslations('channel.detail.actions');
+    const tCommon = useTranslations('common');
 
     const [selectedChannelId, setSelectedChannelId] = useState<number | null>(null);
     const [text, setText] = useState('');
     const [lastMessage, setLastMessage] = useState<string>('');
     const [page, setPage] = useState(1);
     const [enabledFilter, setEnabledFilter] = useState<'all' | 'enabled' | 'disabled'>('all');
+    const [isFileImporting, setIsFileImporting] = useState(false);
+    const [importStatus, setImportStatus] = useState<{
+        active: boolean;
+        currentBatch: number;
+        totalBatches: number;
+        added: number;
+        skipped: number;
+    }>({ active: false, currentBatch: 0, totalBatches: 0, added: 0, skipped: 0 });
+    const fileInputRef = useRef<HTMLInputElement | null>(null);
 
     const importKeys = useImportChannelKeys();
     const restoreKeys = useRestoreInvalidChannelKeys();
@@ -62,22 +74,86 @@ export function KeyPool() {
     const total = keyPage.data?.total ?? 0;
     const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
+
+
+
+    const handleFileImportClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const runImport = async (rawText: string) => {
+        if (!selectedChannelId) {
+            toast.error('请选择渠道后再导入');
+            return;
+        }
+        const lines = rawText
+            .split(/\r?\n/)
+            .map((l) => l.trim())
+            .filter(Boolean);
+        if (lines.length === 0) {
+            toast.error('文件内容为空');
+            return;
+        }
+
+        const totalBatches = Math.ceil(lines.length / CHUNK_SIZE);
+        setImportStatus({ active: true, currentBatch: 0, totalBatches, added: 0, skipped: 0 });
+
+        let added = 0;
+        let skipped = 0;
+        try {
+            for (let i = 0; i < totalBatches; i++) {
+                const chunk = lines.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE).join('\n');
+                const res = await importKeys.mutateAsync({ channel_id: selectedChannelId!, text: chunk });
+                added += res.added ?? 0;
+                skipped += res.skipped ?? 0;
+                setImportStatus({ active: true, currentBatch: i + 1, totalBatches, added, skipped });
+            }
+            const msg = t('importSuccess', { added, skipped });
+            toast.success(msg);
+            setLastMessage(msg);
+            setText('');
+            keyPage.refetch();
+            setPage(1);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Import failed';
+            toast.error(message);
+        } finally {
+            setImportStatus({ active: false, currentBatch: 0, totalBatches: 0, added: 0, skipped: 0 });
+        }
+    };
+
+    const handleFileImport = async (file: File) => {
+        if (!selectedChannelId) {
+            toast.error('请选择渠道后再导入');
+            return;
+        }
+        if (file.size > MAX_FILE_SIZE) {
+            toast.error('文件过大，最大支持 50MB 的 TXT');
+            return;
+        }
+        setIsFileImporting(true);
+        try {
+            const content = await file.text();
+            await runImport(content);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Import failed';
+            toast.error(message);
+        } finally {
+            setIsFileImporting(false);
+        }
+    };
+
+    const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        // 重置 value 以便选择同一文件也能触发
+        e.target.value = '';
+        if (!file) return;
+        await handleFileImport(file);
+    };
+
     const handleImport = () => {
         if (!selectedChannelId || !text.trim()) return;
-        importKeys.mutate(
-            { channel_id: selectedChannelId, text },
-            {
-                onSuccess: (res) => {
-                    const msg = t('importSuccess', { added: res.added ?? 0, skipped: res.skipped ?? 0 });
-                    toast.success(msg);
-                    setLastMessage(msg);
-                    setText('');
-                    keyPage.refetch();
-                    setPage(1);
-                },
-                onError: (error) => toast.error(error.message ?? 'Import failed'),
-            }
-        );
+        runImport(text);
     };
 
     const handleRestore = () => {
@@ -174,8 +250,15 @@ export function KeyPool() {
                             value={text}
                             onChange={(e) => setText(e.target.value)}
                         />
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".txt"
+                            className="hidden"
+                            onChange={handleFileInputChange}
+                        />
                         <div className="flex flex-wrap gap-2">
-                            <Button onClick={handleImport} disabled={importKeys.isPending || !text.trim()} className="rounded-xl">
+                            <Button onClick={handleImport} disabled={importKeys.isPending || !text.trim() || importStatus.active} className="rounded-xl">
                                 {importKeys.isPending ? (
                                     <span className="flex items-center gap-2">
                                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -183,6 +266,24 @@ export function KeyPool() {
                                     </span>
                                 ) : (
                                     t('import')
+                                )}
+                            </Button>
+                            <Button
+                                variant="outline"
+                                onClick={handleFileImportClick}
+                                disabled={isFileImporting || importKeys.isPending || importStatus.active}
+                                className="rounded-xl"
+                            >
+                                {isFileImporting ? (
+                                    <span className="flex items-center gap-2">
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        {tActions('saving')}
+                                    </span>
+                                ) : (
+                                    <span className="flex items-center gap-2">
+                                        <Upload className="h-4 w-4" />
+                                        {t('import')} TXT
+                                    </span>
                                 )}
                             </Button>
                             <Button variant="secondary" onClick={handleRestore} disabled={restoreKeys.isPending} className="rounded-xl">
@@ -206,13 +307,15 @@ export function KeyPool() {
                                 )}
                             </Button>
                         </div>
-                        {(importKeys.isPending || restoreKeys.isPending || clearKeys.isPending) && (
+                        {(importKeys.isPending || restoreKeys.isPending || clearKeys.isPending || importStatus.active) && (
                             <div className="text-sm text-muted-foreground flex items-center gap-2">
                                 <Loader2 className="h-4 w-4 animate-spin" />
-                                {tActions('saving')}
+                                {importStatus.active && importStatus.totalBatches > 0
+                                    ? `导入中 ${importStatus.currentBatch}/${importStatus.totalBatches}，新增 ${importStatus.added}，跳过 ${importStatus.skipped}`
+                                    : tActions('saving')}
                             </div>
                         )}
-                        {lastMessage && !importKeys.isPending && !restoreKeys.isPending && !clearKeys.isPending && (
+                        {lastMessage && !importKeys.isPending && !restoreKeys.isPending && !clearKeys.isPending && !importStatus.active && (
                             <div className="text-sm text-muted-foreground">{lastMessage}</div>
                         )}
                     </div>
@@ -221,7 +324,7 @@ export function KeyPool() {
                         <div className="flex items-center justify-between">
                             <div className="text-sm font-medium text-card-foreground">{t('apiKey')}</div>
                             <div className="text-xs text-muted-foreground">
-                                {t('enabled')}: {keyEnabled} · {t('disabled')}: {keyDisabled} · {t('common.pagination.total', { count: total })}
+                                {t('enabled')}: {keyEnabled} · {t('disabled')}: {keyDisabled} · {tCommon('pagination.total', { count: total })}
                             </div>
                         </div>
                         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
