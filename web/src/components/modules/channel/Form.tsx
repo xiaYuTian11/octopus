@@ -13,7 +13,8 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from '@/components/common/Toast';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
-import { RefreshCw, X, Plus } from 'lucide-react';
+import { RefreshCw, X, Plus, ExternalLink } from 'lucide-react';
+import { useNavStore } from '@/components/modules/navbar';
 
 export interface ChannelKeyFormItem {
     id?: number;
@@ -75,6 +76,7 @@ export function ChannelForm({
     idPrefix = 'channel',
 }: ChannelFormProps) {
     const t = useTranslations('channel.form');
+    const { setActiveItem } = useNavStore();
 
     // Ensure the form always shows at least 1 row for base_urls / keys / custom_header.
     // This avoids "empty list" UI and also keeps URL + APIKEY layout consistent.
@@ -332,6 +334,30 @@ export function ChannelForm({
                 </div>
             </div>
 
+        {formData.key_pool_enabled ? (
+            <div className="space-y-2 rounded-2xl border bg-muted/20 p-3">
+                <div className="flex items-center justify-between">
+                    <div className="space-y-1">
+                        <div className="text-sm font-medium text-card-foreground">{t('apiKey')}</div>
+                        <div className="text-xs text-muted-foreground">{t('keyPoolDesc')}</div>
+                    </div>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="rounded-xl"
+                        onClick={() => setActiveItem('keypool')}
+                    >
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        {t('keyPool')}
+                    </Button>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                    {t('keyPool')}：{formData.keys.length > 0 ? `${formData.keys.length} ${t('apiKey')}` : t('keyPoolDesc')}
+                    <div>{t('keyPoolTools')}</div>
+                </div>
+            </div>
+        ) : (
             <div className="space-y-2">
                 <div className="flex items-center justify-between">
                     <label className="text-sm font-medium text-card-foreground">
@@ -356,7 +382,7 @@ export function ChannelForm({
                                 value={k.channel_key}
                                 onChange={(e) => handleUpdateKey(idx, { channel_key: e.target.value })}
                                 placeholder={t('apiKey')}
-                                required={idx === 0}
+                                required={idx === 0 && !formData.key_pool_enabled}
                                 className="rounded-xl flex-1"
                             />
                             <Input
@@ -385,6 +411,7 @@ export function ChannelForm({
                     ))}
                 </div>
             </div>
+        )}
 
             <div className="space-y-2">
                 <div className="flex items-center justify-between">

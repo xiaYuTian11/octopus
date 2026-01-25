@@ -8,15 +8,18 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useChannelList, useImportChannelKeys, useRestoreInvalidChannelKeys, useClearInvalidChannelKeys } from '@/api/endpoints/channel';
+import { Loader2 } from 'lucide-react';
 
 export function KeyPool() {
     const { data: channels } = useChannelList();
     const poolChannels = useMemo(() => (channels ?? []).filter((c) => c.raw.key_pool_enabled), [channels]);
     const t = useTranslations('channel.form');
     const tNav = useTranslations('navbar');
+    const tActions = useTranslations('channel.detail.actions');
 
     const [selectedChannelId, setSelectedChannelId] = useState<number | null>(null);
     const [text, setText] = useState('');
+    const [lastMessage, setLastMessage] = useState<string>('');
     const importKeys = useImportChannelKeys();
     const restoreKeys = useRestoreInvalidChannelKeys();
     const clearKeys = useClearInvalidChannelKeys();
@@ -38,7 +41,9 @@ export function KeyPool() {
             { channel_id: selectedChannelId, text },
             {
                 onSuccess: (res) => {
-                    toast.success(t('importSuccess', { added: res.added ?? 0, skipped: res.skipped ?? 0 }));
+                    const msg = t('importSuccess', { added: res.added ?? 0, skipped: res.skipped ?? 0 });
+                    toast.success(msg);
+                    setLastMessage(msg);
                     setText('');
                 },
                 onError: (error) => toast.error(error.message ?? 'Import failed'),
@@ -51,7 +56,11 @@ export function KeyPool() {
         restoreKeys.mutate(
             { channel_id: selectedChannelId },
             {
-                onSuccess: (res) => toast.success(t('restoreSuccess', { count: res.restored ?? 0 })),
+                onSuccess: (res) => {
+                    const msg = t('restoreSuccess', { count: res.restored ?? 0 });
+                    toast.success(msg);
+                    setLastMessage(msg);
+                },
                 onError: (error) => toast.error(error.message ?? 'Restore failed'),
             }
         );
@@ -62,7 +71,11 @@ export function KeyPool() {
         clearKeys.mutate(
             { channel_id: selectedChannelId },
             {
-                onSuccess: (res) => toast.success(t('clearSuccess', { count: res.cleared ?? 0 })),
+                onSuccess: (res) => {
+                    const msg = t('clearSuccess', { count: res.cleared ?? 0 });
+                    toast.success(msg);
+                    setLastMessage(msg);
+                },
                 onError: (error) => toast.error(error.message ?? 'Clear failed'),
             }
         );
@@ -141,7 +154,14 @@ export function KeyPool() {
                         disabled={importKeys.isPending || !text.trim()}
                         className="rounded-xl"
                     >
-                        {importKeys.isPending ? t('import') : t('import')}
+                        {importKeys.isPending ? (
+                            <span className="flex items-center gap-2">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                {tActions('saving')}
+                            </span>
+                        ) : (
+                            t('import')
+                        )}
                     </Button>
                     <Button
                         variant="secondary"
@@ -149,7 +169,14 @@ export function KeyPool() {
                         disabled={restoreKeys.isPending}
                         className="rounded-xl"
                     >
-                        {restoreKeys.isPending ? t('restoreInvalid') : t('restoreInvalid')}
+                        {restoreKeys.isPending ? (
+                            <span className="flex items-center gap-2">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                {tActions('saving')}
+                            </span>
+                        ) : (
+                            t('restoreInvalid')
+                        )}
                     </Button>
                     <Button
                         variant="outline"
@@ -157,9 +184,26 @@ export function KeyPool() {
                         disabled={clearKeys.isPending}
                         className="rounded-xl"
                     >
-                        {clearKeys.isPending ? t('clearInvalid') : t('clearInvalid')}
+                        {clearKeys.isPending ? (
+                            <span className="flex items-center gap-2">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                {tActions('saving')}
+                            </span>
+                        ) : (
+                            t('clearInvalid')
+                        )}
                     </Button>
                 </div>
+
+                {(importKeys.isPending || restoreKeys.isPending || clearKeys.isPending) && (
+                    <div className="text-sm text-muted-foreground flex items-center gap-2">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        {tActions('saving')}
+                    </div>
+                )}
+                {lastMessage && !importKeys.isPending && !restoreKeys.isPending && !clearKeys.isPending && (
+                    <div className="text-sm text-muted-foreground">{lastMessage}</div>
+                )}
             </Card>
         </div>
     );

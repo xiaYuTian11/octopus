@@ -46,17 +46,20 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
         custom_header: channel.custom_header ?? [],
         channel_proxy: channel.channel_proxy ?? '',
         param_override: channel.param_override ?? '',
-        keys: channel.keys.length > 0
-            ? channel.keys.map((k) => ({
-                id: k.id,
-                enabled: k.enabled,
-                channel_key: k.channel_key,
-                status_code: k.status_code,
-                last_use_time_stamp: k.last_use_time_stamp,
-                total_cost: k.total_cost,
-                remark: k.remark,
-            }))
-            : [{ enabled: true, channel_key: '', remark: '' }],
+        // 当启用密钥池时，不预载入全部密钥，避免大列表卡顿；编辑状态下仅保留占位行。
+        keys: (channel.key_pool_enabled ?? false)
+            ? [{ enabled: true, channel_key: '', remark: '' }]
+            : channel.keys.length > 0
+                ? channel.keys.map((k) => ({
+                    id: k.id,
+                    enabled: k.enabled,
+                    channel_key: k.channel_key,
+                    status_code: k.status_code,
+                    last_use_time_stamp: k.last_use_time_stamp,
+                    total_cost: k.total_cost,
+                    remark: k.remark,
+                }))
+                : [{ enabled: true, channel_key: '', remark: '' }],
         model: channel.model,
         custom_model: channel.custom_model,
         proxy: channel.proxy,
@@ -124,30 +127,37 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
 
         const originalKeys = channel.keys;
         const originalByID = new Map(originalKeys.map((k) => [k.id, k]));
-        const nextKeys = formData.keys ?? [];
+        // 当双方均为密钥池模式时，不下发密钥 diff，避免在海量 Key 时阻塞 UI。
+        if (formData.key_pool_enabled && channel.key_pool_enabled) {
+            // no-op for keys; rest fields continue
+        } else {
+            const originalKeys = channel.keys;
+            const originalByID = new Map(originalKeys.map((k) => [k.id, k]));
+            const nextKeys = formData.keys ?? [];
 
-        const nextIDs = new Set(nextKeys.filter((k) => typeof k.id === 'number').map((k) => k.id as number));
-        const keys_to_delete = originalKeys.filter((k) => !nextIDs.has(k.id)).map((k) => k.id);
+            const nextIDs = new Set(nextKeys.filter((k) => typeof k.id === 'number').map((k) => k.id as number));
+            const keys_to_delete = originalKeys.filter((k) => !nextIDs.has(k.id)).map((k) => k.id);
 
-        const keys_to_add = nextKeys
-            .filter((k) => !k.id && k.channel_key.trim())
-            .map((k) => ({ enabled: k.enabled, channel_key: k.channel_key, remark: k.remark ?? '' }));
+            const keys_to_add = nextKeys
+                .filter((k) => !k.id && k.channel_key.trim())
+                .map((k) => ({ enabled: k.enabled, channel_key: k.channel_key, remark: k.remark ?? '' }));
 
-        const keys_to_update = nextKeys
-            .filter((k) => typeof k.id === 'number' && originalByID.has(k.id as number))
-            .map((k) => {
-                const orig = originalByID.get(k.id as number)!;
-                const u: { id: number; enabled?: boolean; channel_key?: string; remark?: string } = { id: k.id as number };
-                if (k.enabled !== orig.enabled) u.enabled = k.enabled;
-                if (k.channel_key !== orig.channel_key) u.channel_key = k.channel_key;
-                if ((k.remark ?? '') !== orig.remark) u.remark = k.remark ?? '';
-                return Object.keys(u).length > 1 ? u : null;
-            })
-            .filter((u) => u !== null) as Array<{ id: number; enabled?: boolean; channel_key?: string; remark?: string }>;
+            const keys_to_update = nextKeys
+                .filter((k) => typeof k.id === 'number' && originalByID.has(k.id as number))
+                .map((k) => {
+                    const orig = originalByID.get(k.id as number)!;
+                    const u: { id: number; enabled?: boolean; channel_key?: string; remark?: string } = { id: k.id as number };
+                    if (k.enabled !== orig.enabled) u.enabled = k.enabled;
+                    if (k.channel_key !== orig.channel_key) u.channel_key = k.channel_key;
+                    if ((k.remark ?? '') !== orig.remark) u.remark = k.remark ?? '';
+                    return Object.keys(u).length > 1 ? u : null;
+                })
+                .filter((u) => u !== null) as Array<{ id: number; enabled?: boolean; channel_key?: string; remark?: string }>;
 
-        if (keys_to_add.length > 0) req.keys_to_add = keys_to_add;
-        if (keys_to_update.length > 0) req.keys_to_update = keys_to_update;
-        if (keys_to_delete.length > 0) req.keys_to_delete = keys_to_delete;
+            if (keys_to_add.length > 0) req.keys_to_add = keys_to_add;
+            if (keys_to_update.length > 0) req.keys_to_update = keys_to_update;
+            if (keys_to_delete.length > 0) req.keys_to_delete = keys_to_delete;
+        }
 
         updateChannel.mutate(req, {
             onSuccess: () => {
