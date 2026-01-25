@@ -25,6 +25,12 @@ func (o *ChatOutbound) TransformRequest(ctx context.Context, request *model.Inte
 		}
 	}
 
+	// o 系列模型不再接受 max_tokens，自动迁移到 max_completion_tokens
+	if request.MaxCompletionTokens == nil && request.MaxTokens != nil && isOModel(request.Model) {
+		request.MaxCompletionTokens = request.MaxTokens
+		request.MaxTokens = nil
+	}
+
 	if request.Stream != nil && *request.Stream {
 		if request.StreamOptions == nil {
 			request.StreamOptions = &model.StreamOptions{IncludeUsage: true}
@@ -55,6 +61,22 @@ func (o *ChatOutbound) TransformRequest(ctx context.Context, request *model.Inte
 	req.URL = parsedUrl
 	req.Method = http.MethodPost
 	return req, nil
+}
+
+// isOModel checks if model is o-series / gpt-4.1 family that requires max_completion_tokens.
+func isOModel(modelName string) bool {
+	name := strings.ToLower(strings.TrimSpace(modelName))
+	if name == "" {
+		return false
+	}
+	if strings.HasPrefix(name, "gpt-4.1") {
+		return true
+	}
+	// o1 / o3 / o4 系列
+	if strings.HasPrefix(name, "o1") || strings.HasPrefix(name, "o3") || strings.HasPrefix(name, "o4") {
+		return true
+	}
+	return false
 }
 
 func (o *ChatOutbound) TransformResponse(ctx context.Context, response *http.Response) (*model.InternalLLMResponse, error) {

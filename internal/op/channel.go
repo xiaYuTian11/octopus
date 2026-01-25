@@ -233,15 +233,16 @@ func ChannelKeysImport(ctx context.Context, channelID int, raw string) (added in
 			end = len(keys)
 		}
 		batchKeys := keys[start:end]
-		if err := dbConn.Clauses(clause.OnConflict{
+		result := dbConn.Clauses(clause.OnConflict{
 			Columns:   []clause.Column{{Name: "channel_id"}, {Name: "channel_key"}},
 			DoNothing: true,
-		}).Create(&batchKeys).Error; err != nil {
-			return added, skipped, err
+		}).Create(&batchKeys)
+		if result.Error != nil {
+			return added, skipped, result.Error
 		}
 		// affected rows = inserted; skipped = duplicates
-		added += dbConn.RowsAffected
-		skipped += int64(len(batchKeys)) - dbConn.RowsAffected
+		added += result.RowsAffected
+		skipped += int64(len(batchKeys)) - result.RowsAffected
 	}
 	// refresh cache for the channel
 	_ = channelRefreshCacheByID(channelID, ctx)
