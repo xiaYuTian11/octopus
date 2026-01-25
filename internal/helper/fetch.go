@@ -28,6 +28,13 @@ func setBrowserHeaders(req *http.Request) {
 }
 
 func FetchModels(ctx context.Context, request model.Channel) ([]string, error) {
+	if !request.Enabled {
+		return nil, fmt.Errorf("channel %s is disabled", request.Name)
+	}
+	if key := request.GetChannelKey(); key.ChannelKey == "" {
+		return nil, fmt.Errorf("no enabled api key for channel %s", request.Name)
+	}
+
 	client, err := ChannelHttpClient(&request)
 	if err != nil {
 		return nil, err

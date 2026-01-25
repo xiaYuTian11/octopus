@@ -195,6 +195,10 @@ func syncSingleChannel(c *gin.Context) {
 	// 获取模型列表
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Minute)
 	defer cancel()
+	if !channel.Enabled {
+		resp.Error(c, http.StatusBadRequest, "渠道已禁用，无法同步模型")
+		return
+	}
 
 	fetchModels, err := helper.FetchModels(ctx, *channel)
 	if err != nil {

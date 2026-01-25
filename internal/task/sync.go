@@ -35,6 +35,10 @@ func SyncModelsTask() {
 		if !channel.AutoSync {
 			continue
 		}
+		if !channel.Enabled {
+			log.Infof("skip auto-sync for disabled channel %s (id=%d)", channel.Name, channel.ID)
+			continue
+		}
 		fetchModels, err := helper.FetchModels(ctx, channel)
 		if err != nil {
 			log.Warnf("failed to fetch models for channel %s: %v", channel.Name, err)
