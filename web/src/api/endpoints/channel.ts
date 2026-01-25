@@ -276,6 +276,7 @@ export function useEnableChannel() {
         onSuccess: () => {
             logger.log('渠道状态更新成功');
             queryClient.invalidateQueries({ queryKey: ['channels', 'list'] });
+            queryClient.invalidateQueries({ queryKey: ['models', 'channel'] });
         },
         onError: (error) => {
             logger.error('渠道状态更新失败:', error);
