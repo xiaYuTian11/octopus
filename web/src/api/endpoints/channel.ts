@@ -409,6 +409,18 @@ export type TestChannelResponse = {
     error?: string;
 };
 
+export type ValidateChannelKeysRequest = {
+    channel_id: number;
+    model: string;
+    timeout?: number;
+};
+
+export type ValidateChannelKeysResponse = {
+    tested: number;
+    disabled: number;
+    success: number;
+};
+
 /**
  * 导入渠道密钥 Hook
  */
@@ -419,6 +431,22 @@ export function useImportChannelKeys() {
             return apiClient.post<{ added: number; skipped: number }>('/api/v1/channel/keys/import', data);
         },
         onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['channels', 'list'] });
+        },
+    });
+}
+
+/**
+ * 批量验证渠道密钥池
+ */
+export function useValidateChannelKeys() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (data: ValidateChannelKeysRequest) => {
+            return apiClient.post<ValidateChannelKeysResponse>('/api/v1/channel/keys/validate', data);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['channel', 'keys'] });
             queryClient.invalidateQueries({ queryKey: ['channels', 'list'] });
         },
     });

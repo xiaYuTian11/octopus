@@ -13,6 +13,7 @@ import {
     useRestoreInvalidChannelKeys,
     useClearInvalidChannelKeys,
     useChannelKeys,
+    useValidateChannelKeys,
 } from '@/api/endpoints/channel';
 import { Loader2, RefreshCcw, Upload } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -28,7 +29,6 @@ export function KeyPool() {
     const t = useTranslations('channel.form');
     const tNav = useTranslations('navbar');
     const tActions = useTranslations('channel.detail.actions');
-    const tCommon = useTranslations('common');
 
     const [selectedChannelId, setSelectedChannelId] = useState<number | null>(null);
     const [text, setText] = useState('');
@@ -36,6 +36,8 @@ export function KeyPool() {
     const [page, setPage] = useState(1);
     const [enabledFilter, setEnabledFilter] = useState<'all' | 'enabled' | 'disabled'>('all');
     const [isFileImporting, setIsFileImporting] = useState(false);
+    const [validateModel, setValidateModel] = useState('gpt-4.1-nano');
+    const [validateSummary, setValidateSummary] = useState<string>('');
     const [importStatus, setImportStatus] = useState<{
         active: boolean;
         currentBatch: number;
@@ -49,6 +51,7 @@ export function KeyPool() {
     const importKeys = useImportChannelKeys();
     const restoreKeys = useRestoreInvalidChannelKeys();
     const clearKeys = useClearInvalidChannelKeys();
+    const validateKeys = useValidateChannelKeys();
 
     useEffect(() => {
         if (selectedChannelId === null && poolChannels.length > 0) {
@@ -193,6 +196,35 @@ export function KeyPool() {
         );
     };
 
+    const handleValidate = () => {
+        if (!selectedChannelId) {
+            toast.error('请先选择渠道');
+            return;
+        }
+        const model = validateModel.trim();
+        if (!model) {
+            toast.error('请输入要测试的模型');
+            return;
+        }
+        setValidateSummary('');
+        validateKeys.mutate(
+            { channel_id: selectedChannelId, model, timeout: 15 },
+            {
+                onSuccess: (res) => {
+                    const msg = `测试完成：总计 ${res.tested}，成功 ${res.success}，禁用 ${res.disabled}`;
+                    toast.success(msg);
+                    setValidateSummary(msg);
+                    setLastMessage(msg);
+                    keyPage.refetch();
+                },
+                onError: (error) => {
+                    const message = error instanceof Error ? error.message : '验证失败';
+                    toast.error(message);
+                },
+            }
+        );
+    };
+
     if (!poolChannels || poolChannels.length === 0) {
         return (
             <div className="p-6 md:p-10">
@@ -240,7 +272,7 @@ export function KeyPool() {
                         <label className="text-sm font-medium text-card-foreground">{t('apiKey')}</label>
                         <Input className="rounded-xl" value={keyTotal} disabled />
                         <div className="text-xs text-muted-foreground">
-                            {t('enabled')}: {keyEnabled} · {t('disabled')}: {keyDisabled}
+                            {t('enabled')}: {keyEnabled} / {t('disabled')}: {keyDisabled}
                         </div>
                     </div>
                 </div>
@@ -311,6 +343,36 @@ export function KeyPool() {
                                 )}
                             </Button>
                         </div>
+                        <div className="flex flex-wrap items-end gap-3">
+                            <div className="space-y-1">
+                                <label className="text-xs text-muted-foreground">测试模型</label>
+                                <Input
+                                    className="rounded-xl w-56"
+                                    value={validateModel}
+                                    onChange={(e) => setValidateModel(e.target.value)}
+                                    placeholder="如 gpt-4.1-nano"
+                                    disabled={validateKeys.isPending}
+                                />
+                            </div>
+                            <Button
+                                type="button"
+                                onClick={handleValidate}
+                                disabled={validateKeys.isPending || importStatus.active || isFileImporting}
+                                className="rounded-xl"
+                            >
+                                {validateKeys.isPending ? (
+                                    <span className="flex items-center gap-2">
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        测试中...
+                                    </span>
+                                ) : (
+                                    '一键测试'
+                                )}
+                            </Button>
+                            {validateSummary && !validateKeys.isPending && (
+                                <div className="text-xs text-muted-foreground">{validateSummary}</div>
+                            )}
+                        </div>
                         {(importKeys.isPending || restoreKeys.isPending || clearKeys.isPending || importStatus.active) && (
                             <div className="text-sm text-muted-foreground flex items-center gap-2">
                                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -328,7 +390,7 @@ export function KeyPool() {
                         <div className="flex items-center justify-between">
                             <div className="text-sm font-medium text-card-foreground">{t('apiKey')}</div>
                             <div className="text-xs text-muted-foreground">
-                                {t('enabled')}: {keyEnabled} · {t('disabled')}: {keyDisabled} · {tCommon('pagination.total', { count: total })}
+                                {t('enabled')}: {keyEnabled} / {t('disabled')}: {keyDisabled} / 总计 {total}
                             </div>
                         </div>
                         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">

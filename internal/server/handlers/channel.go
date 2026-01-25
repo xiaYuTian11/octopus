@@ -50,6 +50,10 @@ func init() {
 				Handle(importChannelKeys),
 		).
 		AddRoute(
+			router.NewRoute("/keys/validate", http.MethodPost).
+				Handle(ValidateKeysHandler),
+		).
+		AddRoute(
 			router.NewRoute("/keys/list", http.MethodPost).
 				Handle(listChannelKeys),
 		).

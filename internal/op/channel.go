@@ -88,6 +88,8 @@ func ChannelSelectKey(ctx context.Context, ch *model.Channel) (model.ChannelKey,
 	q := db.GetDB().WithContext(ctx).
 		Model(&model.ChannelKey{}).
 		Where("channel_id = ? AND enabled = ? AND channel_key <> ''", ch.ID, true).
+		// 排除明显占位/无效 key，例如长度 < 8
+		Where("LENGTH(channel_key) >= 8").
 		Where("(status_code != 429 OR last_use_time_stamp = 0 OR ? - last_use_time_stamp >= ?)", now, cooldownSec).
 		Order("last_use_time_stamp ASC").
 		Order("id ASC")
