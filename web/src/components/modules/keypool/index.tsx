@@ -46,6 +46,8 @@ export function KeyPool() {
         skipped: number;
         dedupSkipped: number;
     }>({ active: false, currentBatch: 0, totalBatches: 0, added: 0, skipped: 0, dedupSkipped: 0 });
+    const [validateStart, setValidateStart] = useState<number | null>(null);
+    const [validateElapsed, setValidateElapsed] = useState<number>(0);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
 
     const importKeys = useImportChannelKeys();
@@ -62,6 +64,18 @@ export function KeyPool() {
     useEffect(() => {
         setPage(1);
     }, [selectedChannelId, enabledFilter]);
+
+    useEffect(() => {
+        if (validateStart === null) {
+            setValidateElapsed(0);
+            return;
+        }
+        setValidateElapsed(0);
+        const timer = setInterval(() => {
+            setValidateElapsed(Math.floor((Date.now() - validateStart) / 1000));
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [validateStart]);
 
     const selectedChannel = useMemo(
         () => poolChannels.find((c) => c.raw.id === selectedChannelId),
@@ -207,6 +221,7 @@ export function KeyPool() {
             return;
         }
         setValidateSummary('');
+        setValidateStart(Date.now());
         validateKeys.mutate(
             { channel_id: selectedChannelId, model, timeout: 15 },
             {
@@ -220,6 +235,10 @@ export function KeyPool() {
                 onError: (error) => {
                     const message = error instanceof Error ? error.message : '验证失败';
                     toast.error(message);
+                },
+                onSettled: () => {
+                    setValidateStart(null);
+                    setValidateElapsed(0);
                 },
             }
         );
@@ -373,15 +392,26 @@ export function KeyPool() {
                                 <div className="text-xs text-muted-foreground">{validateSummary}</div>
                             )}
                         </div>
-                        {(importKeys.isPending || restoreKeys.isPending || clearKeys.isPending || importStatus.active) && (
+                        {(validateKeys.isPending ||
+                            importKeys.isPending ||
+                            restoreKeys.isPending ||
+                            clearKeys.isPending ||
+                            importStatus.active) && (
                             <div className="text-sm text-muted-foreground flex items-center gap-2">
                                 <Loader2 className="h-4 w-4 animate-spin" />
-                                {importStatus.active && importStatus.totalBatches > 0
+                                {validateKeys.isPending
+                                    ? `测试中${validateElapsed > 0 ? `，已用时 ${validateElapsed}s` : ''}，请勿关闭页面`
+                                    : importStatus.active && importStatus.totalBatches > 0
                                     ? `导入中 ${importStatus.currentBatch}/${importStatus.totalBatches}，新增 ${importStatus.added}，跳过 ${importStatus.skipped}，去重 ${importStatus.dedupSkipped}`
                                     : tActions('saving')}
                             </div>
                         )}
-                        {lastMessage && !importKeys.isPending && !restoreKeys.isPending && !clearKeys.isPending && !importStatus.active && (
+                        {lastMessage &&
+                            !validateKeys.isPending &&
+                            !importKeys.isPending &&
+                            !restoreKeys.isPending &&
+                            !clearKeys.isPending &&
+                            !importStatus.active && (
                             <div className="text-sm text-muted-foreground">{lastMessage}</div>
                         )}
                     </div>
