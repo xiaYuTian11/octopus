@@ -10,6 +10,7 @@ import (
 
 	"github.com/bestruirui/octopus/internal/model"
 	"github.com/bestruirui/octopus/internal/transformer/outbound"
+	"github.com/dlclark/regexp2"
 )
 
 // 浏览器 Headers，用于绕过基本的 Cloudflare 检测
@@ -31,14 +32,33 @@ func FetchModels(ctx context.Context, request model.Channel) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+	fetchModel := make([]string, 0)
 	switch request.Type {
 	case outbound.OutboundTypeAnthropic:
-		return fetchAnthropicModels(client, ctx, request)
+		fetchModel, err = fetchAnthropicModels(client, ctx, request)
 	case outbound.OutboundTypeGemini:
-		return fetchGeminiModels(client, ctx, request)
+		fetchModel, err = fetchGeminiModels(client, ctx, request)
 	default:
-		return fetchOpenAIModels(client, ctx, request)
+		fetchModel, err = fetchOpenAIModels(client, ctx, request)
 	}
+	if err != nil {
+		return nil, err
+	}
+	if request.MatchRegex != nil {
+		matchModel := make([]string, 0)
+		re := regexp2.MustCompile(*request.MatchRegex, regexp2.ECMAScript)
+		for i := 0; i < len(fetchModel); i++ {
+			matched, err := re.MatchString(fetchModel[i])
+			if err != nil {
+				return nil, err
+			}
+			if matched {
+				matchModel = append(matchModel, fetchModel[i])
+			}
+		}
+		return matchModel, nil
+	}
+	return fetchModel, nil
 }
 
 // isCloudflareChallenge 检测响应是否为 Cloudflare 挑战页面

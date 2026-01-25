@@ -118,6 +118,19 @@ func Handler(inboundType inbound.InboundType, c *gin.Context) {
 			continue
 		}
 
+		// 验证 channel 类型与请求类型匹配
+		if internalRequest.IsEmbeddingRequest() && !outbound.IsEmbeddingChannelType(channel.Type) {
+			log.Warnf("channel type %d is not compatible with embedding request for channel: %s", channel.Type, channel.Name)
+			lastErr = fmt.Errorf("channel type %d not compatible with embedding request", channel.Type)
+			continue
+		}
+
+		if internalRequest.IsChatRequest() && !outbound.IsChatChannelType(channel.Type) {
+			log.Warnf("channel type %d is not compatible with chat request for channel: %s", channel.Type, channel.Name)
+			lastErr = fmt.Errorf("channel type %d not compatible with chat request", channel.Type)
+			continue
+		}
+
 		rc := &relayContext{
 			c:                    c,
 			inAdapter:            inAdapter,
