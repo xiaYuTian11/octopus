@@ -204,7 +204,7 @@ func ChannelKeysImport(ctx context.Context, channelID int, raw string) (added in
 		return 0, 0, fmt.Errorf("invalid channel_id")
 	}
 	lines := strings.Split(raw, "\n")
-	keys := make([]model.ChannelKey, 0, len(lines))
+	unique := make([]string, 0, len(lines))
 	seen := make(map[string]struct{})
 	for _, line := range lines {
 		k := strings.TrimSpace(line)
@@ -215,18 +215,52 @@ func ChannelKeysImport(ctx context.Context, channelID int, raw string) (added in
 			continue
 		}
 		seen[k] = struct{}{}
+		unique = append(unique, k)
+	}
+	if len(unique) == 0 {
+		return 0, 0, nil
+	}
+
+	dbConn := db.GetDB().WithContext(ctx)
+	// 先查出数据库已有的 key，避免没有唯一索引时重复插入。
+	existing := make(map[string]struct{})
+	inBatch := 5000
+	for start := 0; start < len(unique); start += inBatch {
+		end := start + inBatch
+		if end > len(unique) {
+			end = len(unique)
+		}
+		chunk := unique[start:end]
+		var found []string
+		if err := dbConn.Model(&model.ChannelKey{}).
+			Where("channel_id = ? AND channel_key IN ?", channelID, chunk).
+			Pluck("channel_key", &found).Error; err != nil {
+			return 0, 0, err
+		}
+		for _, f := range found {
+			existing[f] = struct{}{}
+		}
+	}
+
+	keys := make([]model.ChannelKey, 0, len(unique))
+	for _, k := range unique {
+		if _, ok := existing[k]; ok {
+			continue
+		}
 		keys = append(keys, model.ChannelKey{
 			ChannelID:  channelID,
 			Enabled:    true,
 			ChannelKey: k,
 		})
 	}
+	// 数据库已有的算作 skipped
+	skipped = int64(len(unique) - len(keys))
+
 	if len(keys) == 0 {
-		return 0, 0, nil
+		return 0, skipped, nil
 	}
 
 	batch := 5000
-	dbConn := db.GetDB().WithContext(ctx)
 	for start := 0; start < len(keys); start += batch {
 		end := start + batch
 		if end > len(keys) {
@@ -641,7 +675,7 @@ func ChannelKeysPage(ctx context.Context, channelID int, page, pageSize int, ena
 		return nil, 0, err
 	}
 	keys := []model.ChannelKey{}
-	if err := query.Order("id DESC").Limit(pageSize).Offset((page-1)*pageSize).Find(&keys).Error; err != nil {
+	if err := query.Order("id DESC").Limit(pageSize).Offset((page - 1) * pageSize).Find(&keys).Error; err != nil {
 		return nil, 0, err
 	}
 	return keys, total, nil
