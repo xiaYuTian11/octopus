@@ -43,6 +43,8 @@ export type ChannelKey = {
     status_code: number;
     last_use_time_stamp: number;
     total_cost: number;
+    failure_count?: number;
+    disabled_reason?: string;
     remark: string;
 };
 
@@ -62,6 +64,8 @@ export type Channel = {
     auto_sync: boolean;
     auto_group: AutoGroupType;
     custom_header: CustomHeader[];
+    key_pool_enabled?: boolean;
+    key_fail_threshold?: number;
     param_override?: string | null;
     channel_proxy?: string | null;
     match_regex?: string | null;
@@ -89,6 +93,8 @@ export type CreateChannelRequest = {
     proxy?: boolean;
     auto_sync?: boolean;
     auto_group?: AutoGroupType;
+    key_pool_enabled?: boolean;
+    key_fail_threshold?: number;
     custom_header?: CustomHeader[];
     channel_proxy?: string | null;
     param_override?: string | null;
@@ -109,6 +115,8 @@ export type UpdateChannelRequest = {
     proxy?: boolean;
     auto_sync?: boolean;
     auto_group?: AutoGroupType;
+    key_pool_enabled?: boolean;
+    key_fail_threshold?: number;
     custom_header?: CustomHeader[];
     channel_proxy?: string | null;
     param_override?: string | null;
@@ -150,6 +158,8 @@ export function useChannelList() {
                 base_urls: item.base_urls ?? [],
                 custom_header: item.custom_header ?? [],
                 keys: item.keys ?? [],
+                key_pool_enabled: !!item.key_pool_enabled,
+                key_fail_threshold: item.key_fail_threshold ?? 3,
             }) satisfies Channel,
             formatted: {
                 input_token: formatCount(item.stats.input_token),
@@ -389,6 +399,51 @@ export type TestChannelResponse = {
     latency: number;
     error?: string;
 };
+
+/**
+ * 导入渠道密钥 Hook
+ */
+export function useImportChannelKeys() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (data: { channel_id: number; text: string }) => {
+            return apiClient.post<{ added: number; skipped: number }>('/api/v1/channel/keys/import', data);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['channels', 'list'] });
+        },
+    });
+}
+
+/**
+ * 恢复禁用密钥 Hook
+ */
+export function useRestoreInvalidChannelKeys() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (data: { channel_id: number }) => {
+            return apiClient.post<{ restored: number }>('/api/v1/channel/keys/restore-invalid', data);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['channels', 'list'] });
+        },
+    });
+}
+
+/**
+ * 清空禁用密钥 Hook
+ */
+export function useClearInvalidChannelKeys() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (data: { channel_id: number }) => {
+            return apiClient.post<{ cleared: number }>('/api/v1/channel/keys/clear-invalid', data);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['channels', 'list'] });
+        },
+    });
+}
 
 /**
  * 测试渠道 Hook

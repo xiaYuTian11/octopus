@@ -3,13 +3,16 @@ package op
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/bestruirui/octopus/internal/db"
 	"github.com/bestruirui/octopus/internal/model"
 	"github.com/bestruirui/octopus/internal/utils/cache"
 	"github.com/bestruirui/octopus/internal/utils/log"
 	"github.com/bestruirui/octopus/internal/utils/xstrings"
+	"gorm.io/gorm/clause"
 )
 
 var channelCache = cache.New[int, model.Channel](16)
@@ -27,6 +30,9 @@ func ChannelList(ctx context.Context) ([]model.Channel, error) {
 }
 
 func ChannelCreate(channel *model.Channel, ctx context.Context) error {
+	if channel.KeyPoolEnabled && channel.KeyFailThreshold <= 0 {
+		channel.KeyFailThreshold = 3
+	}
 	if err := db.GetDB().WithContext(ctx).Create(channel).Error; err != nil {
 		return err
 	}
@@ -37,6 +43,43 @@ func ChannelCreate(channel *model.Channel, ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// ChannelSelectKey chooses a key depending on channel config.
+// For pool mode, it queries DB directly to avoid loading massive key lists into memory.
+// For legacy mode, it keeps existing in-memory selection.
+func ChannelSelectKey(ctx context.Context, ch *model.Channel) (model.ChannelKey, error) {
+	if ch == nil {
+		return model.ChannelKey{}, fmt.Errorf("channel is nil")
+	}
+	if !ch.KeyPoolEnabled {
+		return ch.GetChannelKey(), nil
+	}
+
+	now := time.Now().Unix()
+	cooldownSec := int64(5 * time.Minute / time.Second)
+
+	var key model.ChannelKey
+	q := db.GetDB().WithContext(ctx).
+		Model(&model.ChannelKey{}).
+		Where("channel_id = ? AND enabled = ? AND channel_key <> ''", ch.ID, true).
+		Where("(status_code != 429 OR last_use_time_stamp = 0 OR ? - last_use_time_stamp >= ?)", now, cooldownSec).
+		Order("last_use_time_stamp ASC").
+		Order("id ASC")
+
+	if err := q.First(&key).Error; err != nil {
+		return model.ChannelKey{}, err
+	}
+	return key, nil
+}
+
+// ChannelKeyUpdateImmediate updates caches and persists immediately.
+// Use for pool mode so that failure counts / disabled flags take effect without waiting for cache flush.
+func ChannelKeyUpdateImmediate(ctx context.Context, key model.ChannelKey) error {
+	if err := ChannelKeyUpdate(key); err != nil {
+		return err
+	}
+	return db.GetDB().WithContext(ctx).Save(&key).Error
 }
 
 // ChannelKeyUpdate 仅更新 ChannelKey 的内存缓存（不落库），并标记为需要在 SaveCache 时写入数据库。
@@ -128,6 +171,89 @@ func ChannelKeySaveDB(ctx context.Context) error {
 	return nil
 }
 
+// ChannelKeysImport inserts keys in batches; returns added count and skipped duplicates count.
+func ChannelKeysImport(ctx context.Context, channelID int, raw string) (added int64, skipped int64, err error) {
+	if channelID <= 0 {
+		return 0, 0, fmt.Errorf("invalid channel_id")
+	}
+	lines := strings.Split(raw, "\n")
+	keys := make([]model.ChannelKey, 0, len(lines))
+	seen := make(map[string]struct{})
+	for _, line := range lines {
+		k := strings.TrimSpace(line)
+		if k == "" {
+			continue
+		}
+		if _, ok := seen[k]; ok {
+			continue
+		}
+		seen[k] = struct{}{}
+		keys = append(keys, model.ChannelKey{
+			ChannelID:  channelID,
+			Enabled:    true,
+			ChannelKey: k,
+		})
+	}
+	if len(keys) == 0 {
+		return 0, 0, nil
+	}
+
+	batch := 5000
+	dbConn := db.GetDB().WithContext(ctx)
+	for start := 0; start < len(keys); start += batch {
+		end := start + batch
+		if end > len(keys) {
+			end = len(keys)
+		}
+		batchKeys := keys[start:end]
+		if err := dbConn.Clauses(clause.OnConflict{
+			Columns:   []clause.Column{{Name: "channel_id"}, {Name: "channel_key"}},
+			DoNothing: true,
+		}).Create(&batchKeys).Error; err != nil {
+			return added, skipped, err
+		}
+		// affected rows = inserted; skipped = duplicates
+		added += dbConn.RowsAffected
+		skipped += int64(len(batchKeys)) - dbConn.RowsAffected
+	}
+	// refresh cache for the channel
+	_ = channelRefreshCacheByID(channelID, ctx)
+	return added, skipped, nil
+}
+
+func ChannelKeysRestoreInvalid(ctx context.Context, channelID int) (int64, error) {
+	if channelID <= 0 {
+		return 0, fmt.Errorf("invalid channel_id")
+	}
+	dbConn := db.GetDB().WithContext(ctx)
+	res := dbConn.Model(&model.ChannelKey{}).
+		Where("channel_id = ? AND enabled = ? AND failure_count > 0", channelID, false).
+		Updates(map[string]interface{}{
+			"enabled":         true,
+			"failure_count":   0,
+			"status_code":     0,
+			"disabled_reason": "",
+		})
+	if res.Error != nil {
+		return 0, res.Error
+	}
+	_ = channelRefreshCacheByID(channelID, ctx)
+	return res.RowsAffected, nil
+}
+
+func ChannelKeysClearInvalid(ctx context.Context, channelID int) (int64, error) {
+	if channelID <= 0 {
+		return 0, fmt.Errorf("invalid channel_id")
+	}
+	dbConn := db.GetDB().WithContext(ctx)
+	res := dbConn.Where("channel_id = ? AND enabled = ?", channelID, false).Delete(&model.ChannelKey{})
+	if res.Error != nil {
+		return 0, res.Error
+	}
+	_ = channelRefreshCacheByID(channelID, ctx)
+	return res.RowsAffected, nil
+}
+
 func ChannelUpdate(req *model.ChannelUpdateRequest, ctx context.Context) (*model.Channel, error) {
 	_, ok := channelCache.Get(req.ID)
 	if !ok {
@@ -179,6 +305,18 @@ func ChannelUpdate(req *model.ChannelUpdateRequest, ctx context.Context) (*model
 	if req.AutoGroup != nil {
 		selectFields = append(selectFields, "auto_group")
 		updates.AutoGroup = *req.AutoGroup
+	}
+	if req.KeyPoolEnabled != nil {
+		selectFields = append(selectFields, "key_pool_enabled")
+		updates.KeyPoolEnabled = *req.KeyPoolEnabled
+	}
+	if req.KeyFailThreshold != nil {
+		threshold := *req.KeyFailThreshold
+		if threshold <= 0 {
+			threshold = 3
+		}
+		selectFields = append(selectFields, "key_fail_threshold")
+		updates.KeyFailThreshold = threshold
 	}
 	if req.CustomHeader != nil {
 		selectFields = append(selectFields, "custom_header")

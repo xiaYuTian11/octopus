@@ -98,7 +98,7 @@ export function Card({ channel, stats }: { channel: Channel; stats: StatsMetrics
 
     return (
         <>
-            <MorphingDialog>
+            <MorphingDialog forceReduceMotion>
                 <MorphingDialogTrigger className="w-full">
                     <article className="relative flex h-54 flex-col justify-between gap-5 rounded-3xl border border-border bg-card text-card-foreground p-4 custom-shadow transition-all duration-300 hover:scale-[1.02]">
                         <header className="relative flex items-center justify-between gap-2">

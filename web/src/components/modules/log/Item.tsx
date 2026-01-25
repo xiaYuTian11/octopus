@@ -135,7 +135,7 @@ export function LogCard({ log }: { log: RelayLog }) {
     const hasError = !!log.error;
 
     return (
-        <MorphingDialog>
+        <MorphingDialog forceReduceMotion>
             <MorphingDialogTrigger
                 className={cn(
                     "rounded-3xl border bg-card custom-shadow w-full text-left",

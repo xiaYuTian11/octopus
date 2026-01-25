@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/bestruirui/octopus/internal/model"
+	"github.com/bestruirui/octopus/internal/op"
 	"github.com/bestruirui/octopus/internal/transformer/outbound"
 	"github.com/dlclark/regexp2"
 )
@@ -31,9 +32,12 @@ func FetchModels(ctx context.Context, request model.Channel) ([]string, error) {
 	if !request.Enabled {
 		return nil, fmt.Errorf("channel %s is disabled", request.Name)
 	}
-	if key := request.GetChannelKey(); key.ChannelKey == "" {
+	key, err := op.ChannelSelectKey(ctx, &request)
+	if err != nil || key.ChannelKey == "" {
 		return nil, fmt.Errorf("no enabled api key for channel %s", request.Name)
 	}
+	// Ensure downstream helpers reuse the selected key without triggering pool lookups again.
+	request.Keys = []model.ChannelKey{key}
 
 	client, err := ChannelHttpClient(&request)
 	if err != nil {

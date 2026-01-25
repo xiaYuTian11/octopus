@@ -40,6 +40,8 @@ export interface ChannelFormData {
     auto_sync: boolean;
     auto_group: AutoGroupType;
     match_regex: string;
+    key_pool_enabled: boolean;
+    key_fail_threshold: number;
 }
 
 export interface ChannelFormProps {
@@ -256,6 +258,33 @@ export function ChannelForm({
                             <SelectItem className='rounded-xl' value={String(ChannelType.OpenAIEmbedding)}>{t('typeOpenAIEmbedding')}</SelectItem>
                         </SelectContent>
                     </Select>
+                </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex items-center justify-between rounded-xl border p-3 bg-muted/30">
+                    <div>
+                        <div className="text-sm font-medium text-card-foreground">{t('keyPool')}</div>
+                        <div className="text-xs text-muted-foreground">{t('keyPoolDesc')}</div>
+                    </div>
+                    <Switch
+                        checked={formData.key_pool_enabled}
+                        onCheckedChange={(checked) => onFormDataChange({ ...formData, key_pool_enabled: checked })}
+                    />
+                </div>
+                <div className="space-y-2">
+                    <label htmlFor={`${idPrefix}-key-fail-threshold`} className="text-sm font-medium text-card-foreground">
+                        {t('keyFailThreshold')}
+                    </label>
+                    <Input
+                        className="rounded-xl"
+                        type="number"
+                        id={`${idPrefix}-key-fail-threshold`}
+                        min={1}
+                        value={formData.key_fail_threshold}
+                        onChange={(e) => onFormDataChange({ ...formData, key_fail_threshold: Number(e.target.value || 3) })}
+                        disabled={!formData.key_pool_enabled}
+                    />
                 </div>
             </div>
 

@@ -11,7 +11,7 @@ import {
     Globe,
     Key
 } from 'lucide-react';
-import { useUpdateChannel, useDeleteChannel, type Channel, type UpdateChannelRequest } from '@/api/endpoints/channel';
+import { useUpdateChannel, useDeleteChannel, type Channel, type UpdateChannelRequest, useImportChannelKeys, useRestoreInvalidChannelKeys, useClearInvalidChannelKeys } from '@/api/endpoints/channel';
 import {
     MorphingDialogTitle,
     MorphingDialogDescription,
@@ -31,8 +31,12 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
     const { setIsOpen } = useMorphingDialog();
     const updateChannel = useUpdateChannel();
     const deleteChannel = useDeleteChannel();
+    const importKeys = useImportChannelKeys();
+    const restoreKeys = useRestoreInvalidChannelKeys();
+    const clearKeys = useClearInvalidChannelKeys();
     const [isEditing, setIsEditing] = useState(false);
     const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+    const [poolText, setPoolText] = useState('');
     const [formData, setFormData] = useState<ChannelFormData>({
         name: channel.name,
         type: channel.type,
@@ -58,8 +62,11 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
         auto_sync: channel.auto_sync,
         auto_group: channel.auto_group,
         match_regex: channel.match_regex ?? '',
+        key_pool_enabled: channel.key_pool_enabled ?? false,
+        key_fail_threshold: channel.key_fail_threshold ?? 3,
     });
     const t = useTranslations('channel.detail');
+    const tForm = useTranslations('channel.form');
 
     const currentView = isEditing ? 'editing' : 'viewing';
 
@@ -87,6 +94,8 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
         if (formData.proxy !== channel.proxy) req.proxy = formData.proxy;
         if (formData.auto_sync !== channel.auto_sync) req.auto_sync = formData.auto_sync;
         if (formData.auto_group !== channel.auto_group) req.auto_group = formData.auto_group;
+        if (formData.key_pool_enabled !== channel.key_pool_enabled) req.key_pool_enabled = formData.key_pool_enabled;
+        if (formData.key_fail_threshold !== channel.key_fail_threshold) req.key_fail_threshold = formData.key_fail_threshold;
 
         if (!headersEqual(formData.custom_header, channel.custom_header)) {
             req.custom_header = (formData.custom_header ?? [])
@@ -157,6 +166,45 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
         setTimeout(() => {
             deleteChannel.mutate(channel.id);
         }, 300);
+    };
+
+    const handleImportKeys = () => {
+        if (!formData.key_pool_enabled || !channel.id) return;
+        importKeys.mutate(
+            { channel_id: channel.id, text: poolText },
+            {
+                onSuccess: (res) => {
+                    toast.success(tForm('importSuccess', { added: res.added ?? 0, skipped: res.skipped ?? 0 }));
+                    setPoolText('');
+                    setIsEditing(false);
+                },
+                onError: (error) => {
+                    toast.error(error.message ?? 'Import failed');
+                },
+            }
+        );
+    };
+
+    const handleRestoreInvalid = () => {
+        if (!formData.key_pool_enabled || !channel.id) return;
+        restoreKeys.mutate(
+            { channel_id: channel.id },
+            {
+                onSuccess: (res) => toast.success(tForm('restoreSuccess', { count: res.restored ?? 0 })),
+                onError: (error) => toast.error(error.message ?? 'Restore failed'),
+            }
+        );
+    };
+
+    const handleClearInvalid = () => {
+        if (!formData.key_pool_enabled || !channel.id) return;
+        clearKeys.mutate(
+            { channel_id: channel.id },
+            {
+                onSuccess: (res) => toast.success(tForm('clearSuccess', { count: res.cleared ?? 0 })),
+                onError: (error) => toast.error(error.message ?? 'Clear failed'),
+            }
+        );
     };
 
     return (
@@ -444,6 +492,48 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                         </TabsContent>
 
                         <TabsContent value="editing">
+                            {formData.key_pool_enabled && (
+                                <div className="space-y-3 rounded-2xl border bg-card/60 p-4 mb-4">
+                                    <div className="flex items-center justify-between">
+                                        <div className="text-sm font-medium text-card-foreground">{tForm('keyPoolTools')}</div>
+                                        <div className="text-xs text-muted-foreground">{tForm('keyPoolDesc')}</div>
+                                    </div>
+                                    <textarea
+                                        className="w-full rounded-xl border border-border bg-background p-3 min-h-[120px] text-sm"
+                                        placeholder={tForm('keyPoolPaste')}
+                                        value={poolText}
+                                        onChange={(e) => setPoolText(e.target.value)}
+                                    />
+                                    <div className="flex flex-wrap gap-2">
+                                        <Button
+                                            type="button"
+                                            onClick={handleImportKeys}
+                                            disabled={importKeys.isPending || !poolText.trim()}
+                                            className="rounded-xl"
+                                        >
+                                            {importKeys.isPending ? t('actions.saving') : tForm('import')}
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="secondary"
+                                            onClick={handleRestoreInvalid}
+                                            disabled={restoreKeys.isPending}
+                                            className="rounded-xl"
+                                        >
+                                            {restoreKeys.isPending ? t('actions.saving') : tForm('restoreInvalid')}
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={handleClearInvalid}
+                                            disabled={clearKeys.isPending}
+                                            className="rounded-xl"
+                                        >
+                                            {clearKeys.isPending ? t('actions.saving') : tForm('clearInvalid')}
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
                             <ChannelForm
                                 formData={formData}
                                 onFormDataChange={setFormData}

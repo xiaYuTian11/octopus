@@ -61,15 +61,16 @@
         "expired": "已过期",
         "supportedModels": "支持的模型"
     },
-    "navbar": {
-        "home": "主页",
-        "channel": "渠道",
-        "group": "分组",
-        "key": "密钥",
-        "model": "价格",
-        "log": "日志",
-        "setting": "设置"
-    },
+  "navbar": {
+    "home": "主页",
+    "channel": "渠道",
+    "group": "分组",
+    "key": "密钥",
+    "keypool": "密钥池",
+    "model": "价格",
+    "log": "日志",
+    "setting": "设置"
+  },
     "common": {
         "copy": {
             "success": "复制成功",
@@ -521,9 +522,20 @@
             "autoGroupFuzzy": "模糊匹配",
             "autoGroupExact": "准确匹配",
             "autoGroupRegex": "正则匹配",
-            "matchRegex": "匹配正则",
-            "matchRegexPlaceholder": "可选：用于匹配请求模型名称的正则表达式",
-            "remark": "备注"
-        }
+      "matchRegex": "匹配正则",
+      "matchRegexPlaceholder": "可选：用于匹配请求模型名称的正则表达式",
+      "remark": "备注",
+      "keyPool": "密钥池模式",
+      "keyPoolDesc": "适合海量 Key，自动轮询与禁用失效 Key",
+      "keyFailThreshold": "失败阈值（达阈值自动禁用）",
+      "keyPoolTools": "密钥池导入与维护",
+      "keyPoolPaste": "在此粘贴每行一个 Key",
+      "import": "导入密钥",
+      "restoreInvalid": "恢复被禁用的密钥",
+      "clearInvalid": "清空被禁用的密钥",
+      "importSuccess": "导入完成：新增 {added} 条，跳过 {skipped} 条",
+      "restoreSuccess": "已恢复 {count} 条禁用密钥",
+      "clearSuccess": "已清空 {count} 条禁用密钥"
     }
+  }
 }

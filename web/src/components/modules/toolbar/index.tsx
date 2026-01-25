@@ -23,7 +23,7 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/animate-ui
 import { SyncProgressDialog, type SyncResult } from '@/components/modules/channel/SyncProgressDialog';
 import { useQueryClient } from '@tanstack/react-query';
 
-const TOOLBAR_PAGES: NavItem[] = ['channel', 'group', 'model'];
+const TOOLBAR_PAGES: NavItem[] = ['channel', 'group', 'model', 'keypool'];
 
 function CreateDialogContent({ activeItem }: { activeItem: NavItem }) {
     switch (activeItem) {
@@ -33,6 +33,8 @@ function CreateDialogContent({ activeItem }: { activeItem: NavItem }) {
             return <GroupCreateContent />;
         case 'model':
             return <ModelCreateContent />;
+        case 'keypool':
+            return <ChannelCreateContent />;
         default:
             return null;
     }

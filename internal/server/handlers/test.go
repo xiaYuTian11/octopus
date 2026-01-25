@@ -82,9 +82,9 @@ func doTestChannel(ctx context.Context, channel *model.Channel, modelName string
 		return fmt.Errorf("no base url configured")
 	}
 
-	key := channel.GetChannelKey()
-	if key.ChannelKey == "" {
-		return fmt.Errorf("no api key configured")
+	key, err := op.ChannelSelectKey(ctx, channel)
+	if err != nil || key.ChannelKey == "" {
+		return fmt.Errorf("no api key configured: %w", err)
 	}
 
 	var reqBody []byte

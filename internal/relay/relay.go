@@ -110,6 +110,18 @@ func Handler(inboundType inbound.InboundType, c *gin.Context) {
 		internalRequest.Model = item.ModelName
 		metrics.SetChannel(channel.ID, channel.Name, item.ModelName)
 
+		usedKey, err := op.ChannelSelectKey(c.Request.Context(), channel)
+		if err != nil {
+			log.Warnf("no available key for channel %s: %v", channel.Name, err)
+			lastErr = err
+			continue
+		}
+		if usedKey.ChannelKey == "" {
+			log.Warnf("empty key for channel %s", channel.Name)
+			lastErr = fmt.Errorf("no available key")
+			continue
+		}
+
 		outAdapter := outbound.Get(channel.Type)
 		if outAdapter == nil {
 			log.Warnf("unsupported channel type: %d for channel: %s (attempt %d/%d, tried %d/%d channels)",
@@ -138,7 +150,7 @@ func Handler(inboundType inbound.InboundType, c *gin.Context) {
 			internalRequest:      internalRequest,
 			channel:              channel,
 			metrics:              metrics,
-			usedKey:              channel.GetChannelKey(),
+			usedKey:              usedKey,
 			firstTokenTimeOutSec: group.FirstTokenTimeOut,
 			validator:            NewResponseValidator(),
 		}
@@ -148,13 +160,34 @@ func Handler(inboundType inbound.InboundType, c *gin.Context) {
 			rc.usedKey.StatusCode = statusCode
 			rc.usedKey.LastUseTimeStamp = time.Now().Unix()
 			rc.usedKey.TotalCost += metrics.Stats.InputCost + metrics.Stats.OutputCost
-			op.ChannelKeyUpdate(rc.usedKey)
+			if channel.KeyPoolEnabled {
+				rc.usedKey.FailureCount = 0
+				rc.usedKey.DisabledReason = ""
+				op.ChannelKeyUpdateImmediate(c.Request.Context(), rc.usedKey)
+			} else {
+				op.ChannelKeyUpdate(rc.usedKey)
+			}
 			metrics.Save(c.Request.Context(), true, nil)
 			return
 		} else {
 			rc.usedKey.StatusCode = statusCode
 			rc.usedKey.LastUseTimeStamp = time.Now().Unix()
-			op.ChannelKeyUpdate(rc.usedKey)
+			if channel.KeyPoolEnabled {
+				threshold := channel.KeyFailThreshold
+				if threshold <= 0 {
+					threshold = 3
+				}
+				if shouldCountKeyFailure(statusCode, err) {
+					rc.usedKey.FailureCount++
+					if rc.usedKey.FailureCount >= threshold {
+						rc.usedKey.Enabled = false
+						rc.usedKey.DisabledReason = failureReason(err, statusCode)
+					}
+				}
+				op.ChannelKeyUpdateImmediate(c.Request.Context(), rc.usedKey)
+			} else {
+				op.ChannelKeyUpdate(rc.usedKey)
+			}
 			if c.Writer.Written() {
 				// Streaming responses may have already started; retrying would corrupt the client stream.
 				rc.collectResponse()
@@ -178,6 +211,30 @@ func Handler(inboundType inbound.InboundType, c *gin.Context) {
 	}
 
 	resp.Error(c, http.StatusBadGateway, errorMsg)
+}
+
+func shouldCountKeyFailure(statusCode int, err error) bool {
+	if statusCode >= 500 || statusCode == 401 || statusCode == 403 || statusCode == 429 {
+		return true
+	}
+	if statusCode == 0 && err != nil {
+		return true
+	}
+	return err != nil
+}
+
+func failureReason(err error, statusCode int) string {
+	if err != nil {
+		msg := err.Error()
+		if len(msg) > 256 {
+			return msg[:256]
+		}
+		return msg
+	}
+	if statusCode > 0 {
+		return fmt.Sprintf("status %d", statusCode)
+	}
+	return ""
 }
 
 // parseRequest 解析并验证入站请求

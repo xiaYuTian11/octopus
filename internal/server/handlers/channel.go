@@ -44,6 +44,18 @@ func init() {
 		AddRoute(
 			router.NewRoute("/fetch-model", http.MethodPost).
 				Handle(fetchModel),
+		).
+		AddRoute(
+			router.NewRoute("/keys/import", http.MethodPost).
+				Handle(importChannelKeys),
+		).
+		AddRoute(
+			router.NewRoute("/keys/restore-invalid", http.MethodPost).
+				Handle(restoreInvalidChannelKeys),
+		).
+		AddRoute(
+			router.NewRoute("/keys/clear-invalid", http.MethodPost).
+				Handle(clearInvalidChannelKeys),
 		)
 	router.NewGroupRouter("/api/v1/channel").
 		Use(middleware.Auth()).
@@ -151,6 +163,60 @@ func deleteChannel(c *gin.Context) {
 		return
 	}
 	resp.Success(c, nil)
+}
+
+type importKeysRequest struct {
+	ChannelID int    `json:"channel_id" binding:"required"`
+	Text      string `json:"text" binding:"required"`
+}
+
+func importChannelKeys(c *gin.Context) {
+	var req importKeysRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		resp.Error(c, http.StatusBadRequest, resp.ErrInvalidJSON)
+		return
+	}
+	added, skipped, err := op.ChannelKeysImport(c.Request.Context(), req.ChannelID, req.Text)
+	if err != nil {
+		resp.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	resp.Success(c, gin.H{
+		"added":   added,
+		"skipped": skipped,
+	})
+}
+
+type channelIDRequest struct {
+	ChannelID int `json:"channel_id" binding:"required"`
+}
+
+func restoreInvalidChannelKeys(c *gin.Context) {
+	var req channelIDRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		resp.Error(c, http.StatusBadRequest, resp.ErrInvalidJSON)
+		return
+	}
+	count, err := op.ChannelKeysRestoreInvalid(c.Request.Context(), req.ChannelID)
+	if err != nil {
+		resp.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	resp.Success(c, gin.H{"restored": count})
+}
+
+func clearInvalidChannelKeys(c *gin.Context) {
+	var req channelIDRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		resp.Error(c, http.StatusBadRequest, resp.ErrInvalidJSON)
+		return
+	}
+	count, err := op.ChannelKeysClearInvalid(c.Request.Context(), req.ChannelID)
+	if err != nil {
+		resp.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	resp.Success(c, gin.H{"cleared": count})
 }
 func fetchModel(c *gin.Context) {
 	var request model.Channel

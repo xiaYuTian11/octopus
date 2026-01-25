@@ -61,15 +61,16 @@
         "expired": "Expired",
         "supportedModels": "Supported Models"
     },
-    "navbar": {
-        "home": "Home",
-        "channel": "Channel",
-        "group": "Group",
-        "key": "Key",
-        "model": "Price",
-        "log": "Log",
-        "setting": "Setting"
-    },
+  "navbar": {
+    "home": "Home",
+    "channel": "Channel",
+    "group": "Group",
+    "key": "Key",
+    "keypool": "Key Pool",
+    "model": "Price",
+    "log": "Log",
+    "setting": "Setting"
+  },
     "common": {
         "copy": {
             "success": "Copied",
@@ -480,12 +481,12 @@
             "submit": "Create Channel",
             "submitting": "Creating..."
         },
-        "form": {
-            "add": "Add",
-            "name": "Channel Name",
-            "type": "Channel Type",
-            "baseUrls": "Base URLs",
-            "baseUrlUrl": "URL",
+    "form": {
+      "add": "Add",
+      "name": "Channel Name",
+      "type": "Channel Type",
+      "baseUrls": "Base URLs",
+      "baseUrlUrl": "URL",
             "baseUrlDelay": "Delay(ms)",
             "advanced": "Advanced Settings",
             "apiKey": "API Key",
@@ -521,9 +522,20 @@
             "autoGroupFuzzy": "Fuzzy",
             "autoGroupExact": "Exact",
             "autoGroupRegex": "Regex",
-            "matchRegex": "Match Regex",
-            "matchRegexPlaceholder": "Optional: regex pattern to match request model names",
-            "remark": "Remark"
-        }
+      "matchRegex": "Match Regex",
+      "matchRegexPlaceholder": "Optional: regex pattern to match request model names",
+      "remark": "Remark",
+      "keyPool": "Key Pool Mode",
+      "keyPoolDesc": "For massive keys; auto rotate and disable failing keys",
+      "keyFailThreshold": "Failure threshold (auto disable)",
+      "keyPoolTools": "Key Pool Import & Maintenance",
+      "keyPoolPaste": "Paste keys here, one per line",
+      "import": "Import Keys",
+      "restoreInvalid": "Restore Disabled Keys",
+      "clearInvalid": "Clear Disabled Keys",
+      "importSuccess": "Import done: added {added}, skipped {skipped}",
+      "restoreSuccess": "Restored {count} disabled keys",
+      "clearSuccess": "Cleared {count} disabled keys"
     }
+  }
 }

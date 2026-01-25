@@ -24,6 +24,8 @@ const initialFormData: ChannelFormData = {
     enabled: true,
     proxy: false,
     match_regex: '',
+    key_pool_enabled: false,
+    key_fail_threshold: 3,
 };
 
 export function CreateDialogContent() {
@@ -59,6 +61,8 @@ export function CreateDialogContent() {
                 proxy: formData.proxy,
                 auto_sync: formData.auto_sync,
                 auto_group: formData.auto_group,
+                key_pool_enabled: formData.key_pool_enabled,
+                key_fail_threshold: formData.key_fail_threshold || 3,
                 custom_header: normalizedHeaders,
                 channel_proxy: channelProxy ? channelProxy : null,
                 param_override: paramOverride ? paramOverride : null,
