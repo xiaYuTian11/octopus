@@ -31,6 +31,7 @@ type Channel struct {
 	ParamOverride *string               `json:"param_override"`
 	ChannelProxy  *string               `json:"channel_proxy"`
 	Stats         *StatsChannel         `json:"stats,omitempty" gorm:"foreignKey:ChannelID"`
+	MatchRegex    *string               `json:"match_regex"`
 }
 
 type BaseUrl struct {
@@ -51,6 +52,7 @@ type ChannelKey struct {
 	StatusCode       int     `json:"status_code"`
 	LastUseTimeStamp int64   `json:"last_use_time_stamp"`
 	TotalCost        float64 `json:"total_cost"`
+	Remark           string  `json:"remark"`
 }
 
 // ChannelUpdateRequest 渠道更新请求 - 仅包含变更的数据
@@ -77,12 +79,14 @@ type ChannelUpdateRequest struct {
 type ChannelKeyAddRequest struct {
 	Enabled    bool   `json:"enabled"`
 	ChannelKey string `json:"channel_key" binding:"required"`
+	Remark     string `json:"remark"`
 }
 
 type ChannelKeyUpdateRequest struct {
 	ID         int     `json:"id" binding:"required"`
 	Enabled    *bool   `json:"enabled,omitempty"`
 	ChannelKey *string `json:"channel_key,omitempty"`
+	Remark     *string `json:"remark,omitempty"`
 }
 
 // ChannelFetchModelRequest is used by /channel/fetch-model (not persisted).

@@ -41,7 +41,25 @@ func (i *ChatInbound) TransformStream(ctx context.Context, stream *model.Interna
 	// Store the chunk for aggregation
 	i.streamChunks = append(i.streamChunks, stream)
 
-	body, err := json.Marshal(stream)
+	var body []byte
+	var err error
+
+	// Handle the case where choices are empty but we need them to be present as an empty array
+	// This is to satisfy some clients (like Cherry Studio) that require choices field to be present
+	if len(stream.Choices) == 0 && stream.Object == "chat.completion.chunk" {
+		type Alias model.InternalLLMResponse
+		aux := &struct {
+			*Alias
+			Choices []model.Choice `json:"choices"`
+		}{
+			Alias:   (*Alias)(stream),
+			Choices: []model.Choice{},
+		}
+		body, err = json.Marshal(aux)
+	} else {
+		body, err = json.Marshal(stream)
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -109,12 +127,28 @@ func (i *ChatInbound) GetInternalResponse(ctx context.Context) (*model.InternalL
 					existingChoice.Message.Role = delta.Role
 				}
 
-				// Append content
+				// Append content (handle both string content and multipart content)
 				if delta.Content.Content != nil {
 					if existingChoice.Message.Content.Content == nil {
 						existingChoice.Message.Content.Content = new(string)
 					}
 					*existingChoice.Message.Content.Content += *delta.Content.Content
+				}
+
+				// Append multipart content (for images, audio, etc.)
+				if len(delta.Content.MultipleContent) > 0 {
+					existingChoice.Message.Content.MultipleContent = append(
+						existingChoice.Message.Content.MultipleContent,
+						delta.Content.MultipleContent...,
+					)
+				}
+
+				// Append images (used by Gemini via OpenAI compat endpoint for image generation)
+				if len(delta.Images) > 0 {
+					existingChoice.Message.Content.MultipleContent = append(
+						existingChoice.Message.Content.MultipleContent,
+						delta.Images...,
+					)
 				}
 
 				// Append reasoning content (supports both reasoning_content and reasoning fields)

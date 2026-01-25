@@ -464,6 +464,7 @@
             "modelClearAll": "Clear All",
             "typeOpenAIChat": "OpenAI Chat",
             "typeOpenAIResponse": "OpenAI Response",
+            "typeOpenAIEmbedding": "OpenAI Embedding",
             "typeAnthropic": "Anthropic",
             "typeGemini": "Gemini",
             "typeVolcengine": "Volcengine",
@@ -472,7 +473,10 @@
             "autoGroupNone": "None",
             "autoGroupFuzzy": "Fuzzy",
             "autoGroupExact": "Exact",
-            "autoGroupRegex": "Regex"
+            "autoGroupRegex": "Regex",
+            "matchRegex": "Match Regex",
+            "matchRegexPlaceholder": "Optional: regex pattern to match request model names",
+            "remark": "Remark"
         }
     }
 }
