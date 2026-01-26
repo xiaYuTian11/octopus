@@ -47,23 +47,31 @@ type precheckResult struct {
 // Return handled=true if response is already written to client.
 func maybeHandlePrecheck(c *gin.Context, internalRequest *transformerModel.InternalLLMRequest, inAdapter transformerModel.Inbound) (bool, error) {
 	if internalRequest == nil || !internalRequest.IsChatRequest() {
+		log.Debugf("precheck: skip - not a chat request")
 		return false, nil
 	}
 
 	userIdx, userMsg := firstPrecheckMessage(internalRequest.Messages)
 	if userMsg == nil {
+		log.Debugf("precheck: skip - no user message found")
 		return false, nil
 	}
 
 	userText, ok := messageContentText(userMsg.Content)
 	if !ok {
+		log.Debugf("precheck: skip - cannot extract text from user message")
 		return false, nil
 	}
 
+	log.Debugf("precheck: checking user message (idx=%d), text length=%d, starts with: %.50s...", userIdx, len(userText), userText)
+
 	cleanText, hasPrefix := stripPlanPrefix(userText)
 	if !hasPrefix {
+		log.Debugf("precheck: skip - no %s prefix found", planPrefix)
 		return false, nil
 	}
+
+	log.Infof("precheck: %s prefix detected, starting pre-analysis", planPrefix)
 
 	// Strip the prefix in-place so downstream won't see it even if precheck is skipped.
 	internalRequest.Messages[userIdx].Content = messageContentFromText(cleanText)
