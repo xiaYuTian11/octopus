@@ -19,7 +19,7 @@ export function CreateDialogContent() {
     const t = useTranslations('group');
 
     const handleSubmit = useCallback((values: GroupEditorValues) => {
-        const { name, match_regex, mode, first_token_time_out, members } = values;
+        const { name, match_regex, mode, first_token_time_out, members, tag } = values;
         const items: GroupItem[] = members.map((member, index) => ({
             channel_id: member.channel_id,
             model_name: member.name,
@@ -28,7 +28,7 @@ export function CreateDialogContent() {
         }));
 
         createGroup.mutate(
-            { name, mode, match_regex: match_regex ?? '', first_token_time_out: first_token_time_out ?? 0, items },
+            { name, mode, match_regex: match_regex ?? '', first_token_time_out: first_token_time_out ?? 0, tag: tag ?? '', items },
             {
                 onSuccess: () => setIsOpen(false),
                 onError: (error) => toast.error(t('toast.createFailed'), { description: error.message }),

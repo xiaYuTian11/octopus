@@ -8,6 +8,7 @@ import { useModelChannelList, type LLMChannel } from '@/api/endpoints/model';
 import { Button } from '@/components/ui/button';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { Accordion, AccordionContent, AccordionItem } from '@/components/ui/accordion';
 import { cn } from '@/lib/utils';
 import { getModelIcon } from '@/lib/model-icons';
@@ -17,6 +18,7 @@ import { MemberList } from './ItemList';
 import { matchesGroupName, memberKey, normalizeKey, MODE_LABELS } from './utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/animate-ui/components/animate/tooltip';
 import { HelpCircle } from 'lucide-react';
+import { PRECHECK_TAG } from './constants';
 
 
 
@@ -25,6 +27,7 @@ export type GroupEditorValues = {
     match_regex: string;
     mode: GroupMode;
     first_token_time_out: number;
+    tag?: string;
     members: SelectedMember[];
 };
 
@@ -265,6 +268,7 @@ export function GroupEditor({
     const [matchRegex, setMatchRegex] = useState(initial?.match_regex ?? '');
     const [mode, setMode] = useState<GroupMode>((initial?.mode ?? 1) as GroupMode);
     const [firstTokenTimeOut, setFirstTokenTimeOut] = useState<number>(initial?.first_token_time_out ?? 0);
+    const [precheckEnabled, setPrecheckEnabled] = useState<boolean>((initial?.tag ?? '') === PRECHECK_TAG);
     const [selectedMembers, setSelectedMembers] = useState<SelectedMember[]>(initial?.members ?? []);
     const [removingIds, setRemovingIds] = useState<Set<string>>(new Set());
 
@@ -347,6 +351,7 @@ export function GroupEditor({
             match_regex: regexKey,
             mode,
             first_token_time_out: firstTokenTimeOut,
+            tag: precheckEnabled ? PRECHECK_TAG : '',
             members: selectedMembers,
         });
     };
@@ -416,6 +421,32 @@ export function GroupEditor({
                             />
                         </Field>
                     </div>
+
+                    <Field>
+                        <div className="flex items-center justify-between gap-2">
+                            <FieldLabel>{t('form.precheckTagLabel')}</FieldLabel>
+                            <TooltipProvider>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <HelpCircle className="size-4 text-muted-foreground cursor-help" />
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-sm whitespace-pre-line">
+                                        {t('form.precheckTagHint')}
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                        </div>
+                        <div className="mt-2 flex items-center justify-between gap-3 rounded-xl border border-border/50 bg-muted/30 px-3 py-2">
+                            <p className="text-sm text-muted-foreground leading-relaxed flex-1">
+                                {t('form.precheckTagDescription')}
+                            </p>
+                            <Switch
+                                checked={precheckEnabled}
+                                onCheckedChange={setPrecheckEnabled}
+                                aria-label={t('form.precheckTagLabel')}
+                            />
+                        </div>
+                    </Field>
 
                     {/* Mode */}
                     <div className="flex gap-1">

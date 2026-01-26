@@ -11,8 +11,11 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-var groupCache = cache.New[int, model.Group](16)
-var groupMap = cache.New[string, model.Group](16)
+var (
+	groupCache  = cache.New[int, model.Group](16)
+	groupMap    = cache.New[string, model.Group](16)
+	groupTagMap = cache.New[string, model.Group](4)
+)
 
 func GroupList(ctx context.Context) ([]model.Group, error) {
 	groups := make([]model.Group, 0, groupCache.Len())
@@ -46,13 +49,42 @@ func GroupGetMap(name string, ctx context.Context) (model.Group, error) {
 	return items, nil
 }
 
+func GroupGetByTag(tag string, ctx context.Context) (model.Group, error) {
+	if tag == "" {
+		return model.Group{}, fmt.Errorf("group not found")
+	}
+	group, ok := groupTagMap.Get(tag)
+	if !ok {
+		return model.Group{}, fmt.Errorf("group not found")
+	}
+	return group, nil
+}
+
 func GroupCreate(group *model.Group, ctx context.Context) error {
-	if err := db.GetDB().WithContext(ctx).Create(group).Error; err != nil {
+	tx := db.GetDB().WithContext(ctx).Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	if group.Tag != "" {
+		if err := clearGroupTagTx(tx, group.Tag, 0, ctx); err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	if err := tx.Create(group).Error; err != nil {
+		tx.Rollback()
 		return err
 	}
-	groupCache.Set(group.ID, *group)
-	groupMap.Set(group.Name, *group)
-	return nil
+
+	if err := tx.Commit().Error; err != nil {
+		return err
+	}
+
+	return groupRefreshCacheByID(group.ID, ctx)
 }
 
 func GroupUpdate(req *model.GroupUpdateRequest, ctx context.Context) (*model.Group, error) {
@@ -88,6 +120,14 @@ func GroupUpdate(req *model.GroupUpdateRequest, ctx context.Context) (*model.Gro
 		selectFields = append(selectFields, "first_token_time_out")
 		updates.FirstTokenTimeOut = *req.FirstTokenTimeOut
 	}
+	if req.Tag != nil {
+		selectFields = append(selectFields, "tag")
+		updates.Tag = *req.Tag
+		if err := clearGroupTagTx(tx, *req.Tag, req.ID, ctx); err != nil {
+			tx.Rollback()
+			return nil, err
+		}
+	}
 
 	if len(selectFields) > 0 {
 		if err := tx.Model(&model.Group{}).Where("id = ?", req.ID).Select(selectFields).Updates(&updates).Error; err != nil {
@@ -96,7 +136,7 @@ func GroupUpdate(req *model.GroupUpdateRequest, ctx context.Context) (*model.Gro
 		}
 	}
 
-	// 删除 items
+	// 鍒犻櫎 items
 	if len(req.ItemsToDelete) > 0 {
 		if err := tx.Where("id IN ? AND group_id = ?", req.ItemsToDelete, req.ID).Delete(&model.GroupItem{}).Error; err != nil {
 			tx.Rollback()
@@ -104,7 +144,7 @@ func GroupUpdate(req *model.GroupUpdateRequest, ctx context.Context) (*model.Gro
 		}
 	}
 
-	// 批量更新 items
+	// 鎵归噺鏇存柊 items
 	if len(req.ItemsToUpdate) > 0 {
 		ids := make([]int, len(req.ItemsToUpdate))
 		priorityCase := "CASE id"
@@ -128,7 +168,7 @@ func GroupUpdate(req *model.GroupUpdateRequest, ctx context.Context) (*model.Gro
 		}
 	}
 
-	// 批量新增 items
+	// 鎵归噺鏂板 items
 	if len(req.ItemsToAdd) > 0 {
 		newItems := make([]model.GroupItem, len(req.ItemsToAdd))
 		for i, item := range req.ItemsToAdd {
@@ -150,16 +190,16 @@ func GroupUpdate(req *model.GroupUpdateRequest, ctx context.Context) (*model.Gro
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	// 刷新缓存并返回最新数据
+	// 鍒锋柊缂撳瓨骞惰繑鍥炴渶鏂版暟鎹?
 	if err := groupRefreshCacheByID(req.ID, ctx); err != nil {
 		return nil, err
 	}
 
-	// 获取更新后的分组信息
+	// 鑾峰彇鏇存柊鍚庣殑鍒嗙粍淇℃伅
 	group, _ := groupCache.Get(req.ID)
 
-	// 如果名称发生变更，需要删除旧名称的映射
-	// 注意：groupRefreshCacheByID 已经设置了新名称的映射
+	// 濡傛灉鍚嶇О鍙戠敓鍙樻洿锛岄渶瑕佸垹闄ゆ棫鍚嶇О鐨勬槧灏?
+	// 娉ㄦ剰锛歡roupRefreshCacheByID 宸茬粡璁剧疆浜嗘柊鍚嶇О鐨勬槧灏?
 	if req.Name != nil && *req.Name != oldName {
 		groupMap.Del(oldName)
 	}
@@ -196,6 +236,9 @@ func GroupDel(id int, ctx context.Context) error {
 
 	groupCache.Del(id)
 	groupMap.Del(group.Name)
+	if group.Tag != "" {
+		groupTagMap.Del(group.Tag)
+	}
 	return nil
 }
 
@@ -292,7 +335,7 @@ func GroupItemDel(id int, ctx context.Context) error {
 	return groupRefreshCacheByID(item.GroupID, ctx)
 }
 
-// GroupItemBatchDelByChannelAndModels 根据渠道ID和模型名称批量删除分组项
+// GroupItemBatchDelByChannelAndModels 鏍规嵁娓犻亾ID鍜屾ā鍨嬪悕绉版壒閲忓垹闄ゅ垎缁勯」
 func GroupItemBatchDelByChannelAndModels(keys []model.GroupIDAndLLMName, ctx context.Context) error {
 	if len(keys) == 0 {
 		return nil
@@ -347,9 +390,9 @@ func groupRefreshCache(ctx context.Context) error {
 		Find(&groups).Error; err != nil {
 		return err
 	}
+	groupTagMap.Clear()
 	for _, group := range groups {
-		groupCache.Set(group.ID, group)
-		groupMap.Set(group.Name, group)
+		setGroupCache(group)
 	}
 	return nil
 }
@@ -361,8 +404,7 @@ func groupRefreshCacheByID(id int, ctx context.Context) error {
 		First(&group, id).Error; err != nil {
 		return err
 	}
-	groupCache.Set(group.ID, group)
-	groupMap.Set(group.Name, group)
+	setGroupCache(group)
 	return nil
 }
 
@@ -378,8 +420,52 @@ func groupRefreshCacheByIDs(ids []int, ctx context.Context) error {
 		return err
 	}
 	for _, group := range groups {
-		groupCache.Set(group.ID, group)
-		groupMap.Set(group.Name, group)
+		setGroupCache(group)
 	}
+	return nil
+}
+
+func setGroupCache(group model.Group) {
+	groupCache.Set(group.ID, group)
+	groupMap.Set(group.Name, group)
+	removeGroupIDFromTagMap(group.ID)
+	if group.Tag != "" {
+		groupTagMap.Set(group.Tag, group)
+	}
+}
+
+func removeGroupIDFromTagMap(id int) {
+	for tag, g := range groupTagMap.GetAll() {
+		if g.ID == id {
+			groupTagMap.Del(tag)
+		}
+	}
+}
+
+func clearGroupTagTx(tx *gorm.DB, tag string, excludeID int, ctx context.Context) error {
+	if tag == "" {
+		return nil
+	}
+
+	var ids []int
+	query := tx.Model(&model.Group{}).Where("tag = ?", tag)
+	if excludeID > 0 {
+		query = query.Where("id <> ?", excludeID)
+	}
+	if err := query.Pluck("id", &ids).Error; err != nil {
+		return fmt.Errorf("failed to query groups by tag: %w", err)
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+
+	if err := query.Update("tag", "").Error; err != nil {
+		return fmt.Errorf("failed to clear duplicate tag: %w", err)
+	}
+
+	if err := groupRefreshCacheByIDs(ids, ctx); err != nil {
+		return err
+	}
+	groupTagMap.Del(tag)
 	return nil
 }

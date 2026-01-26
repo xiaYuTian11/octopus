@@ -16,6 +16,7 @@ import { MemberList } from './ItemList';
 import { GroupEditor, type GroupEditorValues } from './Editor';
 import { buildChannelNameByModelKey, modelChannelKey, MODE_LABELS } from './utils';
 import { GroupMode, type GroupUpdateRequest } from '@/api/endpoints/group';
+import { PRECHECK_TAG } from './constants';
 import {
     MorphingDialog,
     MorphingDialogClose,
@@ -55,6 +56,7 @@ function EditDialogContent({ group, displayMembers, isSubmitting, onSubmit }: Ed
                         match_regex: group.match_regex ?? '',
                         mode: group.mode,
                         first_token_time_out: group.first_token_time_out ?? 0,
+                        tag: group.tag ?? '',
                         members: displayMembers,
                     }}
                     submitText={t('detail.actions.save')}
@@ -217,11 +219,13 @@ export function GroupCard({ group }: { group: Group }) {
         const nextName = values.name.trim();
         const nextRegex = (values.match_regex ?? '').trim();
         const nextFirstTokenTimeOut = values.first_token_time_out ?? 0;
+        const nextTag = values.tag ?? '';
 
         if (nextName && nextName !== group.name) payload.name = nextName;
         if (values.mode !== group.mode) payload.mode = values.mode;
         if (nextRegex !== (group.match_regex ?? '')) payload.match_regex = nextRegex;
         if (nextFirstTokenTimeOut !== (group.first_token_time_out ?? 0)) payload.first_token_time_out = nextFirstTokenTimeOut;
+        if (nextTag !== (group.tag ?? '')) payload.tag = nextTag;
         if (items_to_add.length) payload.items_to_add = items_to_add;
         if (items_to_update.length) payload.items_to_update = items_to_update;
         if (items_to_delete.length) payload.items_to_delete = items_to_delete;
@@ -238,7 +242,7 @@ export function GroupCard({ group }: { group: Group }) {
             },
             onError,
         });
-    }, [group.first_token_time_out, group.id, group.items, group.match_regex, group.mode, group.name, onSuccess, onError, updateGroup]);
+    }, [group.first_token_time_out, group.id, group.items, group.match_regex, group.mode, group.name, group.tag, onSuccess, onError, updateGroup]);
 
     const getTestTargets = useCallback((): TestTarget[] => {
         return displayMembers.map(m => ({
@@ -258,6 +262,18 @@ export function GroupCard({ group }: { group: Group }) {
                         </TooltipTrigger>
                         <TooltipContent key={group.name}>{group.name}</TooltipContent>
                     </Tooltip>
+                    {group.tag === PRECHECK_TAG && (
+                        <Tooltip side="top" sideOffset={8} align="start">
+                            <TooltipTrigger asChild>
+                                <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[11px] font-medium">
+                                    {t('form.precheckTagLabel')}
+                                </span>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-sm whitespace-pre-line">
+                                {t('form.precheckTagHint')}
+                            </TooltipContent>
+                        </Tooltip>
+                    )}
                 </div>
 
                 <div className="flex items-center gap-1 shrink-0">
