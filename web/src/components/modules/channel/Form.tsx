@@ -447,6 +447,15 @@ export function ChannelForm({
                                 placeholder={t('remark')}
                                 className="rounded-xl w-32"
                             />
+                            <Input
+                                type="number"
+                                value={k.rate_limit_rpm ?? 0}
+                                onChange={(e) => handleUpdateKey(idx, { rate_limit_rpm: Number(e.target.value || 0) })}
+                                placeholder={t('rateLimitRpm')}
+                                title={t('rateLimitRpmHint')}
+                                min={0}
+                                className="rounded-xl w-24"
+                            />
                             <Switch
                                 checked={k.enabled}
                                 onCheckedChange={(checked) => handleUpdateKey(idx, { enabled: checked })}

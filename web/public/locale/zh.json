@@ -541,7 +541,9 @@
             "clearSuccess": "已清理 {count} 个禁用密钥",
             "disabled": "禁用",
             "keyRateLimitRpm": "每分钟请求限制",
-            "keyRateLimitRpmHint": "每个 Key 每分钟最大请求数，0 表示不限制"
+            "keyRateLimitRpmHint": "每个 Key 每分钟最大请求数，0 表示不限制",
+            "rateLimitRpm": "RPM",
+            "rateLimitRpmHint": "每分钟最大请求数，0 表示不限制"
         }
     }
 }

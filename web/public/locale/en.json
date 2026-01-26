@@ -541,7 +541,9 @@
             "clearSuccess": "Cleared {count} disabled keys",
             "disabled": "Disabled",
             "keyRateLimitRpm": "Rate Limit (RPM)",
-            "keyRateLimitRpmHint": "Max requests per minute per key, 0 means no limit"
+            "keyRateLimitRpmHint": "Max requests per minute per key, 0 means no limit",
+            "rateLimitRpm": "RPM",
+            "rateLimitRpmHint": "Max requests per minute, 0 means no limit"
         }
     }
 }
