@@ -1,7 +1,7 @@
 {
     "test": {
-        "title": "渠道连通性测试",
-        "progress": "测试进度",
+        "title": "渠道连通测试",
+        "progress": "进度",
         "success": "成功",
         "failed": "失败",
         "cancel": "取消",
@@ -11,7 +11,7 @@
         "testGroup": "测试分组",
         "selectModels": "选择模型",
         "searchModels": "搜索模型...",
-        "selectedCount": "已选择 {count} / {total}",
+        "selectedCount": "已选 {count} / {total}",
         "selectAll": "全选",
         "deselectAll": "取消全选",
         "noModelsFound": "未找到模型",
@@ -25,11 +25,11 @@
         "apikey": "API 密钥",
         "apikeyPlaceholder": "请输入 API 密钥 (sk-octopus-...)",
         "mode": {
-            "user": "账户登录",
+            "user": "账号登录",
             "apikey": "密钥登录"
         },
         "error": {
-            "generic": "登录失败,请检查登录凭据"
+            "generic": "登录失败，请检查凭据"
         },
         "button": {
             "loading": "登录中...",
@@ -37,39 +37,39 @@
         }
     },
     "apiKeyDashboard": {
-        "error": "加载数据失败",
+        "error": "数据加载失败",
         "logout": "退出",
         "requestStats": "请求统计",
-        "totalStats": "全部统计",
+        "totalStats": "总览统计",
         "inputStats": "输入统计",
         "outputStats": "输出统计",
         "requestCount": "请求次数",
-        "timeConsumed": "消耗时间",
-        "totalToken": "消耗 Token",
-        "totalCost": "消耗费用",
+        "timeConsumed": "耗时",
+        "totalToken": "总 Token",
+        "totalCost": "总花费",
         "inputTokens": "输入 Tokens",
-        "inputCost": "输入费用",
+        "inputCost": "输入成本",
         "outputTokens": "输出 Tokens",
-        "outputCost": "输出费用",
+        "outputCost": "输出成本",
         "successRequests": "成功请求",
         "failedRequests": "失败请求",
         "quota": "剩余额度",
         "unlimited": "无限制",
-        "expireAt": "过期时间",
+        "expireAt": "到期时间",
         "neverExpire": "永不过期",
         "daysLeft": "天后到期",
         "expired": "已过期",
         "supportedModels": "支持的模型"
     },
     "navbar": {
-        "home": "主页",
+        "home": "首页",
         "channel": "渠道",
         "group": "分组",
         "key": "密钥",
+        "keypool": "密钥池",
         "model": "价格",
         "log": "日志",
-        "setting": "设置",
-        "keypool": "???"
+        "setting": "设置"
     },
     "common": {
         "copy": {
@@ -78,47 +78,47 @@
             "noContent": "无可复制内容"
         },
         "pagination": {
-            "all": "??",
-            "showAll": "????",
-            "total": "? {count} ?"
+            "all": "全部",
+            "showAll": "显示全部",
+            "total": "共 {count} 条"
         }
     },
     "home": {
         "activity": {
             "requestCount": "请求次数",
             "waitTime": "等待时间",
-            "totalToken": "消耗 Token",
-            "totalCost": "消耗费用",
-            "noData": "无数据"
+            "totalToken": "总 Token",
+            "totalCost": "总花费",
+            "noData": "暂无数据"
         },
         "total": {
             "requestStats": "请求统计",
-            "totalStats": "全部统计",
+            "totalStats": "总览统计",
             "inputStats": "输入统计",
             "outputStats": "输出统计",
             "requestCount": "请求次数",
-            "timeConsumed": "消耗时间",
-            "totalToken": "消耗 Token",
-            "totalCost": "消耗费用",
+            "timeConsumed": "耗时",
+            "totalToken": "总 Token",
+            "totalCost": "总花费",
             "inputTokens": "输入 Tokens",
-            "inputCost": "输入费用",
+            "inputCost": "输入成本",
             "outputTokens": "输出 Tokens",
-            "outputCost": "输出费用"
+            "outputCost": "输出成本"
         },
         "chart": {
-            "totalRequests": "请求次数",
-            "totalCost": "消费金额",
+            "totalRequests": "总请求数",
+            "totalCost": "总花费",
             "timePeriod": "时间范围",
             "period": {
                 "today": "今天",
-                "last7Days": "7天",
-                "last30Days": "30天"
+                "last7Days": "近 7 天",
+                "last30Days": "近 30 天"
             }
         },
         "rank": {
             "title": "排行榜",
-            "sortByCost": "金额",
-            "sortByCount": "次数",
+            "sortByCost": "按花费",
+            "sortByCount": "按次数",
             "noData": "暂无排行数据"
         }
     },
@@ -138,27 +138,27 @@
         },
         "proxyUrl": {
             "label": "代理地址",
-            "placeholder": "请输入代理地址"
+            "placeholder": "请输入代理 URL"
         },
         "statsSaveInterval": {
             "label": "统计保存周期（分钟）",
-            "placeholder": "请输入周期（分钟）"
+            "placeholder": "请输入分钟数"
         },
         "corsAllowOrigins": {
-            "label": "CORS 跨域白名单",
-            "hint": "为空禁止跨域，* 允许所有",
-            "example": "只允许指定域名: https://example.com,https://example2.com"
+            "label": "CORS 允许域名",
+            "hint": "留空=禁止跨域，*=允许全部",
+            "example": "仅允许指定域名: https://example.com,https://example2.com"
         },
         "saved": "已保存",
         "backup": {
-            "title": "备份 / 恢复",
+            "title": "备份 / 还原",
             "export": {
                 "title": "导出",
                 "includeLogs": "包含日志",
                 "includeStats": "包含统计",
                 "button": "下载 JSON",
                 "exporting": "导出中...",
-                "success": "开始导出"
+                "success": "已开始导出"
             },
             "import": {
                 "title": "导入（增量）",
@@ -174,20 +174,20 @@
         "apiKey": {
             "title": "API 密钥",
             "empty": "暂无 API 密钥",
-            "add": "添加密钥",
+            "add": "新增密钥",
             "loadFailed": "加载失败",
             "form": {
                 "name": "名称",
-                "maxCost": "最大金额",
+                "maxCost": "最大花费",
                 "maxCostPlaceholder": "请输入金额",
                 "unlimited": "无限制",
-                "expireAt": "过期日期",
+                "expireAt": "到期日期",
                 "selectDate": "选择日期",
                 "neverExpire": "永不过期",
                 "supportedModels": "支持的模型",
                 "noModels": "暂无可选模型",
-                "modelsHint": "不选择则为无限制",
-                "enabled": "是否启用",
+                "modelsHint": "留空表示不限制",
+                "enabled": "启用",
                 "cancel": "取消",
                 "create": "创建",
                 "save": "保存",
@@ -197,32 +197,32 @@
                 "noData": "暂无统计数据",
                 "inputToken": "输入 Token",
                 "outputToken": "输出 Token",
-                "inputCost": "输入费用",
-                "outputCost": "输出费用",
-                "requestSuccess": "成功请求",
-                "requestFailed": "失败请求"
+                "inputCost": "输入成本",
+                "outputCost": "输出成本",
+                "requestSuccess": "请求成功",
+                "requestFailed": "请求失败"
             },
             "toast": {
-                "createSuccess": "API 密钥创建成功",
-                "createError": "API 密钥创建失败",
-                "updateSuccess": "API 密钥更新成功",
-                "updateError": "API 密钥更新失败",
-                "deleteSuccess": "API 密钥删除成功",
-                "deleteError": "API 密钥删除失败"
+                "createSuccess": "创建成功",
+                "createError": "创建失败",
+                "updateSuccess": "更新成功",
+                "updateError": "更新失败",
+                "deleteSuccess": "删除成功",
+                "deleteError": "删除失败"
             }
         },
         "llmPrice": {
-            "title": "模型价格",
+            "title": "模型定价",
             "updateInterval": {
                 "label": "自动更新间隔（小时）",
-                "placeholder": "请输入间隔（小时）"
+                "placeholder": "请输入小时数"
             },
             "manualUpdate": {
                 "label": "手动更新价格",
                 "button": "立即更新",
                 "updating": "更新中..."
             },
-            "lastUpdate": "上次更新",
+            "lastUpdate": "最近更新",
             "neverUpdated": "从未更新",
             "updateSuccess": "价格更新成功",
             "updateFailed": "价格更新失败"
@@ -231,17 +231,17 @@
             "title": "渠道同步",
             "syncInterval": {
                 "label": "自动同步间隔（小时）",
-                "placeholder": "请输入间隔（小时）"
+                "placeholder": "请输入小时数"
             },
             "manualSync": {
                 "label": "手动同步渠道",
                 "button": "立即同步",
                 "syncing": "同步中..."
             },
-            "lastSync": "上次同步",
+            "lastSync": "最近同步",
             "neverSynced": "从未同步",
-            "syncSuccess": "渠道同步成功",
-            "syncFailed": "渠道同步失败"
+            "syncSuccess": "同步成功",
+            "syncFailed": "同步失败"
         },
         "account": {
             "title": "账户设置",
@@ -262,7 +262,7 @@
                 "oldEmpty": "请输入当前密码",
                 "newEmpty": "请输入新密码",
                 "mismatch": "两次输入的密码不一致",
-                "tooShort": "密码长度至少为6位",
+                "tooShort": "密码至少 6 位",
                 "change": "修改密码",
                 "success": "密码修改成功",
                 "failed": "密码修改失败"
@@ -276,11 +276,11 @@
             "publishedAt": "发布时间",
             "github": "GitHub 仓库",
             "unknown": "未知",
-            "versionMismatch": "版本不匹配",
+            "versionMismatch": "版本不一致",
             "versionMismatchHint": "前端版本 ({frontend}) 与后端版本 ({backend}) 不一致，可能是浏览器缓存问题，请强制刷新页面。",
             "forceRefresh": "强制刷新",
-            "newVersionAvailable": "发现新版本可用",
-            "newVersionAvailableHint": "请先备份数据，然后更新系统",
+            "newVersionAvailable": "有新版本",
+            "newVersionAvailableHint": "更新前请先备份数据",
             "updateNow": "立即更新",
             "updating": "更新中...",
             "updateSuccess": "更新成功，服务即将重启",
@@ -289,10 +289,10 @@
         "log": {
             "title": "日志设置",
             "enabled": {
-                "label": "启用历史日志"
+                "label": "开启历史日志"
             },
             "keepPeriod": {
-                "label": "日志保存天数",
+                "label": "日志保留天数",
                 "placeholder": "请输入天数"
             },
             "clear": {
@@ -334,13 +334,13 @@
         "form": {
             "name": "分组名称",
             "matchRegex": "匹配正则",
-            "matchRegexPlaceholder": "留空则默认按分组名称模糊匹配",
+            "matchRegexPlaceholder": "留空则按分组名模糊匹配",
             "matchRegexInvalid": "正则无效",
-            "firstTokenTimeOut": "首字超时",
-            "firstTokenTimeOutHint": "单位秒，仅流式响应起效，0 表示不限制",
+            "firstTokenTimeOut": "首 Token 超时",
+            "firstTokenTimeOutHint": "单位秒，仅流式生效，0 表示不限制",
             "precheckTagLabel": "前置分析分组",
-            "precheckTagHint": "将此分组标记为唯一的前置分析分组（标签 clarify-precheck）。只有以 [[plan]] 开头的请求会先调用该分组做澄清，超时 10 秒或失败会直接转发原请求；重新设置会自动清除其他分组的标记。",
-            "precheckTagDescription": "仅 [[plan]] 显式触发才会前置分析，其余请求保持直接转发。",
+            "precheckTagHint": "将此分组标记为唯一的前置分析分组（标签 clarify-precheck）。只有以 /plan 开头的请求会先调用该分组做澄清，超时 10 秒或失败会直接转发原请求；重新设置会自动清除其他分组的标记。",
+            "precheckTagDescription": "仅 /plan 显式触发才会前置分析，其余请求直接转发。",
             "items": "已选模型",
             "addItem": "添加模型",
             "autoAdd": "自动添加",
@@ -353,7 +353,7 @@
             "roundRobin": "轮询",
             "random": "随机",
             "failover": "故障转移",
-            "weighted": "加权分配"
+            "weighted": "加权"
         },
         "empty": "暂无分组，点击左上角按钮创建"
     },
@@ -393,28 +393,51 @@
     },
     "log": {
         "list": {
-            "noMore": "没有更多日志了"
+            "noMore": "没有更多日志"
         },
         "card": {
             "error": "错误",
             "errorInfo": "错误信息",
-            "firstToken": "首字",
+            "firstToken": "首 Token",
             "totalTime": "总耗时",
             "input": "输入",
             "output": "输出",
-            "cost": "费用",
+            "cost": "成本",
             "requestContent": "请求内容",
             "responseContent": "响应内容",
-            "noRequestContent": "(无请求内容)",
-            "noResponseContent": "(无响应内容)",
-            "firstTokenTime": "首字时间",
+            "noRequestContent": "（无请求内容）",
+            "noResponseContent": "（无响应内容）",
+            "firstTokenTime": "首 Token 时间",
             "tokens": "tokens"
         }
     },
     "channel": {
+        "batchSync": {
+            "button": "批量同步",
+            "buttonMobile": "同步",
+            "syncing": "同步中",
+            "progress": "正在同步 {current}/{total}",
+            "success": "同步完成",
+            "successDetail": "成功 {success}，失败 {failed}",
+            "failed": "同步失败",
+            "noAutoSyncChannels": "没有开启自动同步的渠道"
+        },
+        "syncProgress": {
+            "title": "同步进度",
+            "completed": "已完成 {current}/{total}",
+            "successCount": "成功: {count}",
+            "errorCount": "失败: {count}",
+            "syncingCount": "同步中: {count}",
+            "statusPending": "待处理",
+            "statusSyncing": "同步中",
+            "statusSuccess": "成功",
+            "statusError": "失败",
+            "close": "关闭",
+            "syncing": "同步中..."
+        },
         "card": {
-            "requestCount": "请求次数",
-            "totalCost": "总成本",
+            "requestCount": "请求数",
+            "totalCost": "总花费",
             "toast": {
                 "enabled": "渠道已启用",
                 "disabled": "渠道已禁用"
@@ -427,15 +450,15 @@
             },
             "sections": {
                 "requests": "请求详情",
-                "tokens": "Token 使用",
+                "tokens": "Token 用量",
                 "costs": "成本详情",
-                "baseUrls": "Base URLs",
+                "baseUrls": "基础 URL",
                 "keys": "密钥"
             },
-            "noBaseUrls": "暂无 Base URL",
+            "noBaseUrls": "暂无基础 URL",
             "noKeys": "暂无密钥",
             "metrics": {
-                "totalRequests": "总请求",
+                "totalRequests": "总请求数",
                 "totalToken": "总 Token",
                 "totalCost": "总成本",
                 "successRequests": "成功请求",
@@ -457,7 +480,7 @@
             }
         },
         "create": {
-            "dialogTitle": "创建新渠道",
+            "dialogTitle": "新建渠道",
             "submit": "创建渠道",
             "submitting": "创建中..."
         },
@@ -465,81 +488,58 @@
             "add": "添加",
             "name": "渠道名称",
             "type": "渠道类型",
-            "baseUrls": "Base URLs",
-            "baseUrlUrl": "地址",
+            "baseUrls": "基础 URL",
+            "baseUrlUrl": "URL",
             "baseUrlDelay": "延迟(ms)",
             "advanced": "高级设置",
-            "apiKey": "API Key",
+            "apiKey": "API 密钥",
             "customHeader": "自定义 Header",
             "customHeaderKey": "Header Key",
             "customHeaderValue": "Header Value",
             "customHeaderAdd": "添加 Header",
             "channelProxy": "渠道代理",
-            "channelProxyPlaceholder": "可选：仅对该渠道生效（覆盖全局代理）",
+            "channelProxyPlaceholder": "可选：仅作用于此渠道，覆盖全局代理",
             "paramOverride": "参数覆盖",
-            "paramOverridePlaceholder": "可选：JSON 字符串，用于覆盖请求参数",
+            "paramOverridePlaceholder": "可选：JSON 字符串覆盖请求参数",
             "model": "模型",
             "enabled": "启用",
             "proxy": "使用代理",
-            "modelCustomPlaceholder": "自定义模型名称",
+            "modelCustomPlaceholder": "自定义模型名",
             "modelAdd": "添加",
             "modelRefresh": "刷新",
-            "modelRefreshSuccess": "模型列表获取成功",
-            "modelRefreshFailed": "模型列表获取失败",
-            "modelRefreshEmpty": "未获取到模型列表",
+            "modelRefreshSuccess": "模型获取成功",
+            "modelRefreshFailed": "获取模型失败",
+            "modelRefreshEmpty": "未获取到模型",
             "modelSelected": "已选模型",
-            "modelNoSelected": "暂未选择模型",
-            "modelClearAll": "清除全部",
+            "modelNoSelected": "未选择模型",
+            "modelClearAll": "清空选择",
             "typeOpenAIChat": "OpenAI Chat",
             "typeOpenAIResponse": "OpenAI Response",
+            "typeOpenAIEmbedding": "OpenAI Embedding",
             "typeAnthropic": "Anthropic",
             "typeGemini": "Gemini",
             "typeVolcengine": "火山引擎",
             "autoSync": "自动同步",
             "autoGroup": "自动分组",
-            "autoGroupNone": "不自动分组",
-            "autoGroupFuzzy": "模糊匹配",
-            "autoGroupExact": "准确匹配",
-            "autoGroupRegex": "正则匹配",
-            "clearInvalid": "??????",
-            "clearSuccess": "??? {count} ?????",
-            "import": "????",
-            "importSuccess": "??????? {added}??? {skipped}",
-            "keyFailThreshold": "??????????",
-            "keyPool": "?????",
-            "keyPoolDesc": "???????????????????",
-            "keyPoolPaste": "???????????",
-            "keyPoolTools": "????????",
-            "matchRegex": "????",
-            "matchRegexPlaceholder": "????????????????",
-            "remark": "??",
-            "restoreInvalid": "??????",
-            "restoreSuccess": "??? {count} ?????",
-            "typeOpenAIEmbedding": "OpenAI Embedding",
-            "disabled": "??"
-        },
-        "batchSync": {
-            "button": "????",
-            "buttonMobile": "??",
-            "syncing": "???",
-            "progress": "??? {current}/{total}",
-            "success": "????",
-            "successDetail": "?? {success}??? {failed}",
-            "failed": "????",
-            "noAutoSyncChannels": "???????????"
-        },
-        "syncProgress": {
-            "title": "????",
-            "completed": "??? {current}/{total}",
-            "successCount": "???{count}",
-            "errorCount": "???{count}",
-            "syncingCount": "????{count}",
-            "statusPending": "???",
-            "statusSyncing": "???",
-            "statusSuccess": "??",
-            "statusError": "??",
-            "close": "??",
-            "syncing": "???..."
+            "autoGroupNone": "无",
+            "autoGroupFuzzy": "模糊",
+            "autoGroupExact": "精确",
+            "autoGroupRegex": "正则",
+            "matchRegex": "匹配正则",
+            "matchRegexPlaceholder": "可选：用于匹配请求 model 的正则",
+            "remark": "备注",
+            "keyPool": "密钥池模式",
+            "keyPoolDesc": "用于大规模密钥，自动轮换并禁用失败密钥",
+            "keyFailThreshold": "失败阈值（自动禁用）",
+            "keyPoolTools": "密钥池导入与维护",
+            "keyPoolPaste": "在此粘贴密钥，每行一个",
+            "import": "导入密钥",
+            "restoreInvalid": "恢复已禁用密钥",
+            "clearInvalid": "清理已禁用密钥",
+            "importSuccess": "导入完成：新增 {added}，跳过 {skipped}",
+            "restoreSuccess": "已恢复 {count} 个禁用密钥",
+            "clearSuccess": "已清理 {count} 个禁用密钥",
+            "disabled": "禁用"
         }
     }
 }

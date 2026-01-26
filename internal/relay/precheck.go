@@ -24,7 +24,7 @@ import (
 
 const (
 	precheckGroupTag = "clarify-precheck"
-	planPrefix       = "[[plan]]"
+	planPrefix       = "/plan"
 )
 
 var precheckTimeoutSec = 10
@@ -273,14 +273,22 @@ func stripPlanPrefix(text string) (string, bool) {
 }
 
 func firstPrecheckMessage(msgs []transformerModel.Message) (int, *transformerModel.Message) {
+	// Find the LAST user message (most recent), not the first one.
+	// This is important for multi-turn conversations where [[plan]] prefix
+	// is in the latest user message, not the first one.
+	lastUserIdx := -1
 	for i := range msgs {
 		if strings.ToLower(strings.TrimSpace(msgs[i].Role)) == "user" {
 			if _, ok := messageContentText(msgs[i].Content); ok {
-				return i, &msgs[i]
+				lastUserIdx = i
 			}
 		}
 	}
-	for i := range msgs {
+	if lastUserIdx >= 0 {
+		return lastUserIdx, &msgs[lastUserIdx]
+	}
+	// Fallback: find the last message with text content
+	for i := len(msgs) - 1; i >= 0; i-- {
 		if _, ok := messageContentText(msgs[i].Content); ok {
 			return i, &msgs[i]
 		}
