@@ -2,6 +2,7 @@ package relay
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -120,7 +121,12 @@ func Handler(inboundType inbound.InboundType, c *gin.Context) {
 
 		usedKey, err := op.ChannelSelectKey(c.Request.Context(), channel)
 		if err != nil {
-			log.Warnf("no available key for channel %s: %v", channel.Name, err)
+			// 检查是否是速率限制错误
+			if errors.Is(err, op.ErrAllKeysRateLimited) || errors.Is(err, op.ErrRateLimitExceeded) {
+				log.Warnf("channel %s rate limited: %v", channel.Name, err)
+			} else {
+				log.Warnf("no available key for channel %s: %v", channel.Name, err)
+			}
 			lastErr = err
 			continue
 		}
@@ -213,12 +219,20 @@ func Handler(inboundType inbound.InboundType, c *gin.Context) {
 
 	// 根据错误类型提供更明确的错误消息
 	errorMsg := "all channels failed"
-	if lastErr != nil && IsResponseQualityError(lastErr) {
-		errorMsg = "all channels returned empty or invalid responses"
-		log.Warnf("All channels failed with quality issues: %v", lastErr)
+	statusCode := http.StatusBadGateway
+
+	if lastErr != nil {
+		if errors.Is(lastErr, op.ErrAllKeysRateLimited) || errors.Is(lastErr, op.ErrRateLimitExceeded) {
+			errorMsg = "all channels have reached rate limit, please try again later"
+			statusCode = http.StatusTooManyRequests
+			log.Warnf("All channels rate limited: %v", lastErr)
+		} else if IsResponseQualityError(lastErr) {
+			errorMsg = "all channels returned empty or invalid responses"
+			log.Warnf("All channels failed with quality issues: %v", lastErr)
+		}
 	}
 
-	resp.Error(c, http.StatusBadGateway, errorMsg)
+	resp.Error(c, statusCode, errorMsg)
 }
 
 func shouldCountKeyFailure(statusCode int, err error) bool {

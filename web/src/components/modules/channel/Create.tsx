@@ -26,6 +26,7 @@ const initialFormData: ChannelFormData = {
     match_regex: '',
     key_pool_enabled: false,
     key_fail_threshold: 3,
+    key_rate_limit_rpm: 0,
 };
 
 export function CreateDialogContent() {

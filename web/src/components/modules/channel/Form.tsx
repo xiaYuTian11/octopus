@@ -24,6 +24,7 @@ export interface ChannelKeyFormItem {
     last_use_time_stamp?: number;
     total_cost?: number;
     remark?: string;
+    rate_limit_rpm?: number; // 每分钟最大请求数，0 表示不限制
 }
 
 export interface ChannelFormData {
@@ -43,6 +44,7 @@ export interface ChannelFormData {
     match_regex: string;
     key_pool_enabled: boolean;
     key_fail_threshold: number;
+    key_rate_limit_rpm: number; // 密钥池默认每分钟请求限制
 }
 
 export interface ChannelFormProps {
@@ -318,6 +320,24 @@ export function ChannelForm({
                     />
                 </div>
             </div>
+
+            {formData.key_pool_enabled && (
+                <div className="space-y-2">
+                    <label htmlFor={`${idPrefix}-key-rate-limit-rpm`} className="text-sm font-medium text-card-foreground">
+                        {t('keyRateLimitRpm')}
+                    </label>
+                    <Input
+                        className="rounded-xl"
+                        type="number"
+                        id={`${idPrefix}-key-rate-limit-rpm`}
+                        min={0}
+                        value={formData.key_rate_limit_rpm}
+                        onChange={(e) => onFormDataChange({ ...formData, key_rate_limit_rpm: Number(e.target.value || 0) })}
+                        placeholder="0"
+                    />
+                    <p className="text-xs text-muted-foreground">{t('keyRateLimitRpmHint')}</p>
+                </div>
+            )}
 
             <div className="space-y-2">
                 <div className="flex items-center justify-between">

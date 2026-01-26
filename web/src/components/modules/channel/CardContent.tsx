@@ -60,6 +60,7 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                     last_use_time_stamp: k.last_use_time_stamp,
                     total_cost: k.total_cost,
                     remark: k.remark,
+                    rate_limit_rpm: k.rate_limit_rpm,
                 }))
                 : [{ enabled: true, channel_key: '', remark: '' }],
         model: channel.model,
@@ -70,6 +71,7 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
         match_regex: channel.match_regex ?? '',
         key_pool_enabled: channel.key_pool_enabled ?? false,
         key_fail_threshold: channel.key_fail_threshold ?? 3,
+        key_rate_limit_rpm: 0, // 渠道级别默认值，暂时设为 0
     });
     const t = useTranslations('channel.detail');
     const tForm = useTranslations('channel.form');

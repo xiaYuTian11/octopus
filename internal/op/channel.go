@@ -2,6 +2,7 @@ package op
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -20,6 +21,137 @@ var channelKeyCache = cache.New[int, model.ChannelKey](16)
 var channelKeyCacheNeedUpdate = make(map[int]struct{})
 var channelKeyCacheNeedUpdateLock sync.Mutex
 var channelCacheLock sync.Mutex // 保护 channelCache 的并发访问
+
+// 速率限制相关
+// keyRateLimitCache 存储每个 Key 的请求时间戳列表（滑动窗口）
+// key: ChannelKey.ID, value: 请求时间戳列表
+var keyRateLimitCache = cache.New[int, *rateLimitWindow](16)
+var keyRateLimitLock sync.Mutex
+
+// MaxRateLimitWaitDuration 最大等待时间，当所有 Key 都达到速率限制时，最多等待这么长时间
+var MaxRateLimitWaitDuration = 60 * time.Second
+
+// ErrRateLimitExceeded 表示速率限制已达到
+var ErrRateLimitExceeded = errors.New("rate limit exceeded")
+
+// ErrAllKeysRateLimited 表示所有 Key 都达到了速率限制
+var ErrAllKeysRateLimited = errors.New("all keys have reached rate limit")
+
+// ErrRateLimitWaitTimeout 表示等待速率限制恢复超时
+var ErrRateLimitWaitTimeout = errors.New("rate limit wait timeout exceeded")
+
+// rateLimitWindow 滑动窗口速率限制器
+type rateLimitWindow struct {
+	mu         sync.Mutex
+	timestamps []int64 // 请求时间戳列表（Unix 秒）
+	windowSec  int64   // 窗口大小（秒）
+}
+
+// newRateLimitWindow 创建新的滑动窗口
+func newRateLimitWindow(windowSec int64) *rateLimitWindow {
+	return &rateLimitWindow{
+		timestamps: make([]int64, 0),
+		windowSec:  windowSec,
+	}
+}
+
+// tryAcquire 尝试获取一个请求配额
+// 返回 true 表示成功获取，false 表示已达到限制
+func (w *rateLimitWindow) tryAcquire(limit int) bool {
+	if limit <= 0 {
+		return true // 不限制
+	}
+
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	now := time.Now().Unix()
+	windowStart := now - w.windowSec
+
+	// 清理过期的时间戳
+	validIdx := 0
+	for _, ts := range w.timestamps {
+		if ts > windowStart {
+			w.timestamps[validIdx] = ts
+			validIdx++
+		}
+	}
+	w.timestamps = w.timestamps[:validIdx]
+
+	// 检查是否超过限制
+	if len(w.timestamps) >= limit {
+		return false
+	}
+
+	// 添加当前时间戳
+	w.timestamps = append(w.timestamps, now)
+	return true
+}
+
+// count 返回当前窗口内的请求数
+func (w *rateLimitWindow) count() int {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	now := time.Now().Unix()
+	windowStart := now - w.windowSec
+
+	count := 0
+	for _, ts := range w.timestamps {
+		if ts > windowStart {
+			count++
+		}
+	}
+	return count
+}
+
+// getNextAvailableTime 获取下一个可用时间点
+// 返回最早的请求时间戳 + 窗口大小，即最早的请求过期的时间
+// 如果当前未达到限制，返回当前时间
+func (w *rateLimitWindow) getNextAvailableTime(limit int) time.Time {
+	if limit <= 0 {
+		return time.Now()
+	}
+
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	now := time.Now().Unix()
+	windowStart := now - w.windowSec
+
+	// 收集有效的时间戳并排序
+	validTimestamps := make([]int64, 0, len(w.timestamps))
+	for _, ts := range w.timestamps {
+		if ts > windowStart {
+			validTimestamps = append(validTimestamps, ts)
+		}
+	}
+
+	// 如果未达到限制，返回当前时间
+	if len(validTimestamps) < limit {
+		return time.Now()
+	}
+
+	// 找到最早的时间戳，它过期后就有一个配额可用
+	minTs := validTimestamps[0]
+	for _, ts := range validTimestamps[1:] {
+		if ts < minTs {
+			minTs = ts
+		}
+	}
+
+	// 返回最早时间戳 + 窗口大小（滑动窗口判断是 ts > windowStart，所以不需要 +1）
+	return time.Unix(minTs+w.windowSec, 0)
+}
+
+// increment 增加请求计数（用于请求成功后调用）
+func (w *rateLimitWindow) increment() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	now := time.Now().Unix()
+	w.timestamps = append(w.timestamps, now)
+}
 
 func ChannelList(ctx context.Context) ([]model.Channel, error) {
 	channels := make([]model.Channel, 0, channelCache.Len())
@@ -73,31 +205,194 @@ func ChannelCreate(channel *model.Channel, ctx context.Context) error {
 // ChannelSelectKey chooses a key depending on channel config.
 // For pool mode, it queries DB directly to avoid loading massive key lists into memory.
 // For legacy mode, it keeps existing in-memory selection.
+// 现在增加了速率限制检查，当所有 Key 都达到限制时会等待而不是直接返回错误。
 func ChannelSelectKey(ctx context.Context, ch *model.Channel) (model.ChannelKey, error) {
 	if ch == nil {
 		return model.ChannelKey{}, fmt.Errorf("channel is nil")
 	}
+
+	startTime := time.Now()
+	maxWait := MaxRateLimitWaitDuration
+
+	for {
+		// 检查是否超过最大等待时间
+		if time.Since(startTime) > maxWait {
+			log.Warnf("channel %d: rate limit wait timeout after %v", ch.ID, maxWait)
+			return model.ChannelKey{}, ErrRateLimitWaitTimeout
+		}
+
+		// 检查 context 是否已取消
+		select {
+		case <-ctx.Done():
+			return model.ChannelKey{}, ctx.Err()
+		default:
+		}
+
+		key, waitDuration, err := trySelectKeyWithRateLimit(ctx, ch)
+		if err == nil {
+			return key, nil
+		}
+
+		if !errors.Is(err, ErrAllKeysRateLimited) {
+			// 其他错误直接返回
+			return model.ChannelKey{}, err
+		}
+
+		// 所有 key 都达到了速率限制，需要等待
+		if waitDuration <= 0 {
+			waitDuration = time.Second // 最小等待 1 秒
+		}
+
+		// 确保不会等待超过剩余的最大等待时间
+		remainingWait := maxWait - time.Since(startTime)
+		if waitDuration > remainingWait {
+			if remainingWait <= 0 {
+				log.Warnf("channel %d: rate limit wait timeout after %v", ch.ID, maxWait)
+				return model.ChannelKey{}, ErrRateLimitWaitTimeout
+			}
+			waitDuration = remainingWait
+		}
+
+		log.Infof("channel %d: all keys rate limited, waiting %v before retry", ch.ID, waitDuration)
+
+		// 使用 select 等待，支持 context 取消
+		select {
+		case <-ctx.Done():
+			return model.ChannelKey{}, ctx.Err()
+		case <-time.After(waitDuration):
+			// 继续重试
+		}
+	}
+}
+
+// trySelectKeyWithRateLimit 尝试选择一个未达到速率限制的 key
+// 返回值：选中的 key，需要等待的时间（如果所有 key 都达到限制），错误
+func trySelectKeyWithRateLimit(ctx context.Context, ch *model.Channel) (model.ChannelKey, time.Duration, error) {
 	if !ch.KeyPoolEnabled {
-		return ch.GetChannelKey(), nil
+		return trySelectKeyFromMemory(ch)
+	}
+	return trySelectKeyFromDB(ctx, ch)
+}
+
+// trySelectKeyFromMemory 从内存中选择 key（非 KeyPool 模式）
+func trySelectKeyFromMemory(ch *model.Channel) (model.ChannelKey, time.Duration, error) {
+	keys := ch.GetAvailableKeys()
+	if len(keys) == 0 {
+		return model.ChannelKey{}, 0, fmt.Errorf("no available key")
 	}
 
-	now := time.Now().Unix()
+	var minWaitTime time.Duration
+	now := time.Now()
+
+	for _, key := range keys {
+		if key.RateLimitRPM <= 0 {
+			// 不限制速率，直接返回
+			return key, 0, nil
+		}
+		if checkKeyRateLimit(key.ID, key.RateLimitRPM) {
+			return key, 0, nil
+		}
+
+		// 计算这个 key 的下一个可用时间
+		waitTime := getKeyNextAvailableWait(key.ID, key.RateLimitRPM, now)
+		if minWaitTime == 0 || waitTime < minWaitTime {
+			minWaitTime = waitTime
+		}
+
+		log.Debugf("key %d rate limit exceeded (%d RPM), next available in %v", key.ID, key.RateLimitRPM, waitTime)
+	}
+
+	// 所有 key 都达到了速率限制
+	log.Debugf("all keys for channel %d have reached rate limit, min wait: %v", ch.ID, minWaitTime)
+	return model.ChannelKey{}, minWaitTime, ErrAllKeysRateLimited
+}
+
+// trySelectKeyFromDB 从数据库中选择 key（KeyPool 模式）
+func trySelectKeyFromDB(ctx context.Context, ch *model.Channel) (model.ChannelKey, time.Duration, error) {
+	now := time.Now()
+	nowUnix := now.Unix()
 	cooldownSec := int64(5 * time.Minute / time.Second)
 
-	var key model.ChannelKey
+	// 获取所有可用的 key，然后逐个检查速率限制
+	var keys []model.ChannelKey
 	q := db.GetDB().WithContext(ctx).
 		Model(&model.ChannelKey{}).
 		Where("channel_id = ? AND enabled = ? AND channel_key <> ''", ch.ID, true).
 		// 排除明显占位/无效 key，例如长度 < 8
 		Where("LENGTH(channel_key) >= 8").
-		Where("(status_code != 429 OR last_use_time_stamp = 0 OR ? - last_use_time_stamp >= ?)", now, cooldownSec).
+		Where("(status_code != 429 OR last_use_time_stamp = 0 OR ? - last_use_time_stamp >= ?)", nowUnix, cooldownSec).
 		Order("last_use_time_stamp ASC").
-		Order("id ASC")
+		Order("id ASC").
+		Limit(100) // 限制查询数量，避免大量 key 时性能问题
 
-	if err := q.First(&key).Error; err != nil {
-		return model.ChannelKey{}, err
+	if err := q.Find(&keys).Error; err != nil {
+		return model.ChannelKey{}, 0, err
 	}
-	return key, nil
+
+	if len(keys) == 0 {
+		return model.ChannelKey{}, 0, fmt.Errorf("no available key")
+	}
+
+	var minWaitTime time.Duration
+
+	// 遍历 key，找到第一个未达到速率限制的
+	for _, key := range keys {
+		if key.RateLimitRPM <= 0 {
+			// 不限制速率，直接返回
+			return key, 0, nil
+		}
+		if checkKeyRateLimit(key.ID, key.RateLimitRPM) {
+			return key, 0, nil
+		}
+
+		// 计算这个 key 的下一个可用时间
+		waitTime := getKeyNextAvailableWait(key.ID, key.RateLimitRPM, now)
+		if minWaitTime == 0 || waitTime < minWaitTime {
+			minWaitTime = waitTime
+		}
+
+		log.Debugf("key %d rate limit exceeded (%d RPM), next available in %v", key.ID, key.RateLimitRPM, waitTime)
+	}
+
+	// 所有 key 都达到了速率限制
+	log.Debugf("all keys for channel %d have reached rate limit, min wait: %v", ch.ID, minWaitTime)
+	return model.ChannelKey{}, minWaitTime, ErrAllKeysRateLimited
+}
+
+// getKeyNextAvailableWait 获取 key 下一个可用时间距离现在的等待时间
+func getKeyNextAvailableWait(keyID int, limitRPM int, now time.Time) time.Duration {
+	keyRateLimitLock.Lock()
+	window, ok := keyRateLimitCache.Get(keyID)
+	if !ok {
+		keyRateLimitLock.Unlock()
+		return 0
+	}
+	keyRateLimitLock.Unlock()
+
+	nextAvailable := window.getNextAvailableTime(limitRPM)
+	waitTime := nextAvailable.Sub(now)
+	if waitTime < 0 {
+		return 0
+	}
+	return waitTime
+}
+
+// checkKeyRateLimit 检查 key 是否达到速率限制
+// 返回 true 表示未达到限制，可以使用
+func checkKeyRateLimit(keyID int, limitRPM int) bool {
+	if limitRPM <= 0 {
+		return true
+	}
+
+	keyRateLimitLock.Lock()
+	window, ok := keyRateLimitCache.Get(keyID)
+	if !ok {
+		window = newRateLimitWindow(60) // 1 分钟窗口
+		keyRateLimitCache.Set(keyID, window)
+	}
+	keyRateLimitLock.Unlock()
+
+	return window.tryAcquire(limitRPM)
 }
 
 // ChannelKeyUpdateImmediate updates caches and persists immediately.
@@ -422,6 +717,9 @@ func ChannelUpdate(req *model.ChannelUpdateRequest, ctx context.Context) (*model
 			if ku.Remark != nil {
 				updates["remark"] = *ku.Remark
 			}
+			if ku.RateLimitRPM != nil {
+				updates["rate_limit_rpm"] = *ku.RateLimitRPM
+			}
 			if len(updates) == 0 {
 				continue
 			}
@@ -439,10 +737,11 @@ func ChannelUpdate(req *model.ChannelUpdateRequest, ctx context.Context) (*model
 		newKeys := make([]model.ChannelKey, 0, len(req.KeysToAdd))
 		for _, ka := range req.KeysToAdd {
 			newKeys = append(newKeys, model.ChannelKey{
-				ChannelID:  req.ID,
-				Enabled:    ka.Enabled,
-				ChannelKey: ka.ChannelKey,
-				Remark:     ka.Remark,
+				ChannelID:    req.ID,
+				Enabled:      ka.Enabled,
+				ChannelKey:   ka.ChannelKey,
+				Remark:       ka.Remark,
+				RateLimitRPM: ka.RateLimitRPM,
 			})
 		}
 		if err := tx.Create(&newKeys).Error; err != nil {

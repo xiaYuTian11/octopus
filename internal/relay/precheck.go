@@ -38,6 +38,14 @@ func init() {
 }
 
 type precheckResult struct {
+	// Ready indicates the request is clear enough to proceed.
+	// When true, ClarifiedRequest contains the enhanced request.
+	// When false, ClarifyMessage contains the follow-up question for user.
+	Ready            bool   `json:"ready"`
+	ClarifiedRequest string `json:"clarified_request"`
+	ClarifyMessage   string `json:"-"` // Natural language follow-up question
+
+	// Legacy fields for backward compatibility
 	CompletedRequest string   `json:"completed_request"`
 	MissingSlots     []string `json:"missing_slots"`
 	AskUser          bool     `json:"ask_user"`
@@ -92,7 +100,15 @@ func maybeHandlePrecheck(c *gin.Context, internalRequest *transformerModel.Inter
 		return false, nil
 	}
 
-	// When ask_user=true, return clarify message and stop.
+	// If precheck returned a clarify message (natural language follow-up), return it to user.
+	if result.ClarifyMessage != "" {
+		if err := sendDirectClarifyResponse(c, inAdapter, internalRequest, result.ClarifyMessage); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+
+	// Legacy: When ask_user=true, return clarify message and stop.
 	if result.AskUser && len(result.MissingSlots) > 0 {
 		if err := sendClarifyResponse(c, inAdapter, internalRequest, originalText, result); err != nil {
 			return false, err
@@ -100,8 +116,25 @@ func maybeHandlePrecheck(c *gin.Context, internalRequest *transformerModel.Inter
 		return true, nil
 	}
 
-	merged := buildMergedContent(originalText, result.CompletedRequest, result.MissingSlots)
+	// Use clarified request if available, otherwise use completed_request (legacy)
+	clarified := result.ClarifiedRequest
+	if clarified == "" {
+		clarified = result.CompletedRequest
+	}
+	if clarified == "" {
+		clarified = originalText
+	}
+
+	// If clarified request is the same as original, just use original (no need to merge)
+	if strings.TrimSpace(clarified) == strings.TrimSpace(originalText) {
+		internalRequest.Messages[userIdx].Content = messageContentFromText(originalText)
+		return false, nil
+	}
+
+	// Build merged content with original and clarified request
+	merged := buildMergedContent(originalText, clarified, result.MissingSlots)
 	internalRequest.Messages[userIdx].Content = messageContentFromText(merged)
+	log.Infof("precheck: request clarified, merged content length=%d", len(merged))
 	return false, nil
 }
 
@@ -250,23 +283,51 @@ func parsePrecheckResult(resp *transformerModel.InternalLLMResponse, original st
 	text = strings.TrimSpace(text)
 
 	var result precheckResult
+
+	// Try to parse as JSON first
 	if err := json.Unmarshal([]byte(text), &result); err != nil {
-		// Try to locate JSON body inside the text.
+		// Try to locate JSON body inside the text
 		start := strings.Index(text, "{")
 		end := strings.LastIndex(text, "}")
 		if start >= 0 && end > start {
-			if err2 := json.Unmarshal([]byte(text[start:end+1]), &result); err2 != nil {
-				// fallback: treat whole text as completion
-				result.CompletedRequest = text
+			jsonStr := text[start : end+1]
+			if err2 := json.Unmarshal([]byte(jsonStr), &result); err2 != nil {
+				// Not valid JSON - treat as natural language clarify message
+				result.ClarifyMessage = text
+				return &result, nil
+			}
+			// Valid JSON found, check if there's text before it (could be clarify message)
+			if start > 0 {
+				prefix := strings.TrimSpace(text[:start])
+				if len(prefix) > 50 { // Significant text before JSON, likely a clarify message
+					result.ClarifyMessage = text
+					return &result, nil
+				}
 			}
 		} else {
-			result.CompletedRequest = text
+			// No JSON found - this is a natural language clarify message
+			result.ClarifyMessage = text
+			return &result, nil
 		}
 	}
 
-	if result.CompletedRequest == "" {
-		result.CompletedRequest = original
+	// If JSON parsed successfully, check the ready field
+	if result.Ready {
+		// Request is clear, use clarified_request
+		if result.ClarifiedRequest == "" {
+			result.ClarifiedRequest = original
+		}
+	} else if result.ClarifiedRequest == "" && result.CompletedRequest == "" && !result.AskUser {
+		// JSON parsed but no useful content - treat original text as clarify message
+		// This handles cases where model outputs JSON-like structure but it's actually a question
+		result.ClarifyMessage = text
 	}
+
+	// Legacy compatibility: if completed_request is set but clarified_request is not
+	if result.ClarifiedRequest == "" && result.CompletedRequest != "" {
+		result.ClarifiedRequest = result.CompletedRequest
+	}
+
 	return &result, nil
 }
 
@@ -322,7 +383,26 @@ func messageContentFromText(text string) transformerModel.MessageContent {
 }
 
 func buildPrecheckPrompt() string {
-	return "你是前置分析助手。请返回 JSON，包含: completed_request（补全后的清晰描述），missing_slots（需补充要点数组，如系统类型、目标用户、核心功能、非功能约束、交付形态），ask_user（布尔值，若需要用户补充信息则为 true）。若信息已足够，missing_slots 为空，ask_user 为 false。仅输出 JSON。"
+	return `你是需求澄清助手。用户的请求可能不够清晰或缺少关键信息。
+
+请分析用户的请求，判断是否需要追问以获取更多信息。
+
+**输出格式要求**：
+- 如果需要追问用户，直接输出友好的追问内容（使用 Markdown 格式，可以用列表、标题等让回复更清晰）
+- 如果信息已经足够清晰，输出 JSON: {"ready": true, "clarified_request": "补全后的清晰描述"}
+
+**判断标准**：
+- 项目类型不明确（如"2pai"可能指树莓派、某个框架等）
+- 缺少核心功能描述
+- 缺少技术栈偏好
+- 缺少目标用户或使用场景
+- 存在歧义需要确认
+
+**追问时的要求**：
+- 友好、专业的语气
+- 列出可能的选项帮助用户选择
+- 提供具体的示例引导用户
+- 使用 emoji 让回复更生动`
 }
 
 func buildMergedContent(original, completion string, missing []string) string {
@@ -353,6 +433,19 @@ func cloneInternalRequest(req *transformerModel.InternalLLMRequest) *transformer
 	if len(req.Messages) > 0 {
 		cp.Messages = append([]transformerModel.Message(nil), req.Messages...)
 	}
+	// Clear parameters that are incompatible with precheck requests.
+	// Precheck always uses stream=false, so stream_options must be cleared.
+	cp.StreamOptions = nil
+	// Clear tool-related parameters as precheck doesn't need function calling.
+	cp.Tools = nil
+	cp.ToolChoice = nil
+	cp.ParallelToolCalls = nil
+	// Clear response format constraints as precheck expects JSON output.
+	cp.ResponseFormat = nil
+	// Clear reasoning parameters that may not be supported by precheck model.
+	cp.ReasoningEffort = ""
+	cp.ReasoningBudget = nil
+	cp.EnableThinking = nil
 	return &cp
 }
 
@@ -443,6 +536,35 @@ func sendClarifyResponse(c *gin.Context, inAdapter transformerModel.Inbound, int
 					Role:    "assistant",
 					Content: messageContentFromText(message),
 				},
+			},
+		},
+	}
+
+	out, err := inAdapter.TransformResponse(c.Request.Context(), payload)
+	if err != nil {
+		return err
+	}
+	c.Data(http.StatusOK, "application/json", out)
+	return nil
+}
+
+// sendDirectClarifyResponse sends the precheck model's natural language response directly to the user.
+// This is used when the precheck model generates a follow-up question in natural language format.
+func sendDirectClarifyResponse(c *gin.Context, inAdapter transformerModel.Inbound, internalRequest *transformerModel.InternalLLMRequest, clarifyMessage string) error {
+	finishReason := "stop"
+	payload := &transformerModel.InternalLLMResponse{
+		ID:      fmt.Sprintf("precheck-%d", time.Now().UnixNano()),
+		Object:  "chat.completion",
+		Created: time.Now().Unix(),
+		Model:   internalRequest.Model,
+		Choices: []transformerModel.Choice{
+			{
+				Index: 0,
+				Message: &transformerModel.Message{
+					Role:    "assistant",
+					Content: messageContentFromText(clarifyMessage),
+				},
+				FinishReason: &finishReason,
 			},
 		},
 	}

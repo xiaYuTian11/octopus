@@ -539,7 +539,9 @@
             "importSuccess": "Import done: added {added}, skipped {skipped}",
             "restoreSuccess": "Restored {count} disabled keys",
             "clearSuccess": "Cleared {count} disabled keys",
-            "disabled": "Disabled"
+            "disabled": "Disabled",
+            "keyRateLimitRpm": "Rate Limit (RPM)",
+            "keyRateLimitRpmHint": "Max requests per minute per key, 0 means no limit"
         }
     }
 }

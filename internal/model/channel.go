@@ -63,6 +63,7 @@ type ChannelKey struct {
 	Remark           string  `json:"remark"`
 	FailureCount     int     `json:"failure_count" gorm:"default:0"`
 	DisabledReason   string  `json:"disabled_reason"`
+	RateLimitRPM     int     `json:"rate_limit_rpm" gorm:"default:0"` // 每分钟最大请求数，0 表示不限制
 }
 
 // ChannelUpdateRequest 渠道更新请求 - 仅包含变更的数据
@@ -89,16 +90,18 @@ type ChannelUpdateRequest struct {
 }
 
 type ChannelKeyAddRequest struct {
-	Enabled    bool   `json:"enabled"`
-	ChannelKey string `json:"channel_key" binding:"required"`
-	Remark     string `json:"remark"`
+	Enabled      bool   `json:"enabled"`
+	ChannelKey   string `json:"channel_key" binding:"required"`
+	Remark       string `json:"remark"`
+	RateLimitRPM int    `json:"rate_limit_rpm"` // 每分钟最大请求数，0 表示不限制
 }
 
 type ChannelKeyUpdateRequest struct {
-	ID         int     `json:"id" binding:"required"`
-	Enabled    *bool   `json:"enabled,omitempty"`
-	ChannelKey *string `json:"channel_key,omitempty"`
-	Remark     *string `json:"remark,omitempty"`
+	ID           int     `json:"id" binding:"required"`
+	Enabled      *bool   `json:"enabled,omitempty"`
+	ChannelKey   *string `json:"channel_key,omitempty"`
+	Remark       *string `json:"remark,omitempty"`
+	RateLimitRPM *int    `json:"rate_limit_rpm,omitempty"` // 每分钟最大请求数，0 表示不限制
 }
 
 // ChannelFetchModelRequest is used by /channel/fetch-model (not persisted).
@@ -169,4 +172,41 @@ func (c *Channel) GetChannelKey() ChannelKey {
 		return ChannelKey{}
 	}
 	return best
+}
+
+// GetAvailableKeys 返回所有可用的密钥列表，按 TotalCost 排序
+// 用于速率限制检查时遍历所有可用 key
+func (c *Channel) GetAvailableKeys() []ChannelKey {
+	if c == nil || len(c.Keys) == 0 {
+		return nil
+	}
+
+	c.keyMutex.Lock()
+	defer c.keyMutex.Unlock()
+
+	nowSec := time.Now().Unix()
+	available := make([]ChannelKey, 0, len(c.Keys))
+
+	for _, k := range c.Keys {
+		if !k.Enabled || k.ChannelKey == "" {
+			continue
+		}
+		if k.StatusCode == 429 && k.LastUseTimeStamp > 0 {
+			if nowSec-k.LastUseTimeStamp < int64(5*time.Minute/time.Second) {
+				continue
+			}
+		}
+		available = append(available, k)
+	}
+
+	// 按 TotalCost 排序（升序）
+	for i := 0; i < len(available)-1; i++ {
+		for j := i + 1; j < len(available); j++ {
+			if available[j].TotalCost < available[i].TotalCost {
+				available[i], available[j] = available[j], available[i]
+			}
+		}
+	}
+
+	return available
 }

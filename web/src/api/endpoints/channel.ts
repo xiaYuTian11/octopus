@@ -46,6 +46,7 @@ export type ChannelKey = {
     failure_count?: number;
     disabled_reason?: string;
     remark: string;
+    rate_limit_rpm?: number; // 每分钟最大请求数，0 表示不限制
 };
 
 /**
@@ -90,7 +91,7 @@ export type CreateChannelRequest = {
     type: ChannelType;
     enabled?: boolean;
     base_urls: BaseUrl[];
-    keys: Array<Pick<ChannelKey, 'enabled' | 'channel_key' | 'remark'>>;
+    keys: Array<Pick<ChannelKey, 'enabled' | 'channel_key' | 'remark' | 'rate_limit_rpm'>>;
     model: string;
     custom_model?: string;
     proxy?: boolean;
@@ -125,8 +126,8 @@ export type UpdateChannelRequest = {
     param_override?: string | null;
     match_regex?: string | null;
     // keys diff
-    keys_to_add?: Array<Pick<ChannelKey, 'enabled' | 'channel_key' | 'remark'>>;
-    keys_to_update?: Array<{ id: number; enabled?: boolean; channel_key?: string; remark?: string }>;
+    keys_to_add?: Array<Pick<ChannelKey, 'enabled' | 'channel_key' | 'remark' | 'rate_limit_rpm'>>;
+    keys_to_update?: Array<{ id: number; enabled?: boolean; channel_key?: string; remark?: string; rate_limit_rpm?: number }>;
     keys_to_delete?: number[];
 };
 
