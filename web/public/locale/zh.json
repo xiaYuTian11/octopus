@@ -1,541 +1,542 @@
 {
     "test": {
-        "title": "Channel Connectivity Test",
-        "progress": "Progress",
-        "success": "Success",
-        "failed": "Failed",
-        "cancel": "Cancel",
-        "close": "Close",
-        "retry": "Retry",
-        "batchTest": "Batch Test",
-        "testGroup": "Test Group",
-        "selectModels": "Select Models",
-        "searchModels": "Search models...",
-        "selectedCount": "Selected {count} / {total}",
-        "selectAll": "Select All",
-        "deselectAll": "Deselect All",
-        "noModelsFound": "No models found",
-        "confirmTest": "Test ({count})"
+        "title": "渠道连通性测试",
+        "progress": "测试进度",
+        "success": "成功",
+        "failed": "失败",
+        "cancel": "取消",
+        "close": "关闭",
+        "retry": "重试",
+        "batchTest": "批量测试",
+        "testGroup": "测试分组",
+        "selectModels": "选择模型",
+        "searchModels": "搜索模型...",
+        "selectedCount": "已选择 {count} / {total}",
+        "selectAll": "全选",
+        "deselectAll": "取消全选",
+        "noModelsFound": "未找到模型",
+        "confirmTest": "测试 ({count})"
     },
     "login": {
-        "username": "Username",
-        "usernamePlaceholder": "Enter your username",
-        "password": "Password",
-        "passwordPlaceholder": "Enter your password",
-        "apikey": "API Key",
-        "apikeyPlaceholder": "Enter your API Key (sk-octopus-...)",
+        "username": "用户名",
+        "usernamePlaceholder": "请输入用户名",
+        "password": "密码",
+        "passwordPlaceholder": "请输入密码",
+        "apikey": "API 密钥",
+        "apikeyPlaceholder": "请输入 API 密钥 (sk-octopus-...)",
         "mode": {
-            "user": "Account",
-            "apikey": "API Key"
+            "user": "账户登录",
+            "apikey": "密钥登录"
         },
         "error": {
-            "generic": "Login failed, please check your credentials"
+            "generic": "登录失败,请检查登录凭据"
         },
         "button": {
-            "loading": "Logging in...",
-            "submit": "Login"
+            "loading": "登录中...",
+            "submit": "登录"
         }
     },
     "apiKeyDashboard": {
-        "error": "Failed to load data",
-        "logout": "Logout",
-        "requestStats": "Request Stats",
-        "totalStats": "Total Stats",
-        "inputStats": "Input Stats",
-        "outputStats": "Output Stats",
-        "requestCount": "Requests",
-        "timeConsumed": "Time Consumed",
-        "totalToken": "Tokens Used",
-        "totalCost": "Total Cost",
-        "inputTokens": "Input Tokens",
-        "inputCost": "Input Cost",
-        "outputTokens": "Output Tokens",
-        "outputCost": "Output Cost",
-        "successRequests": "Successful",
-        "failedRequests": "Failed",
-        "quota": "Remaining Quota",
-        "unlimited": "Unlimited",
-        "expireAt": "Expires",
-        "neverExpire": "Never",
-        "daysLeft": "days left",
-        "expired": "Expired",
-        "supportedModels": "Supported Models"
+        "error": "加载数据失败",
+        "logout": "退出",
+        "requestStats": "请求统计",
+        "totalStats": "全部统计",
+        "inputStats": "输入统计",
+        "outputStats": "输出统计",
+        "requestCount": "请求次数",
+        "timeConsumed": "消耗时间",
+        "totalToken": "消耗 Token",
+        "totalCost": "消耗费用",
+        "inputTokens": "输入 Tokens",
+        "inputCost": "输入费用",
+        "outputTokens": "输出 Tokens",
+        "outputCost": "输出费用",
+        "successRequests": "成功请求",
+        "failedRequests": "失败请求",
+        "quota": "剩余额度",
+        "unlimited": "无限制",
+        "expireAt": "过期时间",
+        "neverExpire": "永不过期",
+        "daysLeft": "天后到期",
+        "expired": "已过期",
+        "supportedModels": "支持的模型"
     },
-  "navbar": {
-    "home": "Home",
-    "channel": "Channel",
-    "group": "Group",
-    "key": "Key",
-    "keypool": "Key Pool",
-    "model": "Price",
-    "log": "Log",
-    "setting": "Setting"
-  },
+    "navbar": {
+        "home": "主页",
+        "channel": "渠道",
+        "group": "分组",
+        "key": "密钥",
+        "model": "价格",
+        "log": "日志",
+        "setting": "设置",
+        "keypool": "???"
+    },
     "common": {
         "copy": {
-            "success": "Copied",
-            "failed": "Copy failed",
-            "noContent": "Nothing to copy"
+            "success": "复制成功",
+            "failed": "复制失败",
+            "noContent": "无可复制内容"
         },
         "pagination": {
-            "all": "All",
-            "showAll": "Show All",
-            "total": "Total {count}"
+            "all": "??",
+            "showAll": "????",
+            "total": "? {count} ?"
         }
     },
     "home": {
         "activity": {
-            "requestCount": "Requests",
-            "waitTime": "Wait Time",
-            "totalToken": "Tokens Used",
-            "totalCost": "Total Cost",
-            "noData": "No Data"
+            "requestCount": "请求次数",
+            "waitTime": "等待时间",
+            "totalToken": "消耗 Token",
+            "totalCost": "消耗费用",
+            "noData": "无数据"
         },
         "total": {
-            "requestStats": "Request Stats",
-            "totalStats": "Total Stats",
-            "inputStats": "Input Stats",
-            "outputStats": "Output Stats",
-            "requestCount": "Requests",
-            "timeConsumed": "Time Consumed",
-            "totalToken": "Tokens Used",
-            "totalCost": "Total Cost",
-            "inputTokens": "Input Tokens",
-            "inputCost": "Input Cost",
-            "outputTokens": "Output Tokens",
-            "outputCost": "Output Cost"
+            "requestStats": "请求统计",
+            "totalStats": "全部统计",
+            "inputStats": "输入统计",
+            "outputStats": "输出统计",
+            "requestCount": "请求次数",
+            "timeConsumed": "消耗时间",
+            "totalToken": "消耗 Token",
+            "totalCost": "消耗费用",
+            "inputTokens": "输入 Tokens",
+            "inputCost": "输入费用",
+            "outputTokens": "输出 Tokens",
+            "outputCost": "输出费用"
         },
         "chart": {
-            "totalRequests": "Total Requests",
-            "totalCost": "Total Cost",
-            "timePeriod": "Time Period",
+            "totalRequests": "请求次数",
+            "totalCost": "消费金额",
+            "timePeriod": "时间范围",
             "period": {
-                "today": "Today",
-                "last7Days": "7 Days",
-                "last30Days": "30 Days"
+                "today": "今天",
+                "last7Days": "7天",
+                "last30Days": "30天"
             }
         },
         "rank": {
-            "title": "Ranking",
-            "sortByCost": "Cost",
-            "sortByCount": "Count",
-            "noData": "No ranking data"
+            "title": "排行榜",
+            "sortByCost": "金额",
+            "sortByCount": "次数",
+            "noData": "暂无排行数据"
         }
     },
     "setting": {
-        "appearance": "Appearance",
-        "system": "System",
+        "appearance": "外观",
+        "system": "系统",
         "theme": {
-            "label": "Theme",
-            "light": "Light",
-            "dark": "Dark",
-            "system": "System"
+            "label": "主题",
+            "light": "浅色",
+            "dark": "深色",
+            "system": "跟随系统"
         },
         "language": {
-            "label": "Language",
+            "label": "语言",
             "zh": "中文",
             "en": "English"
         },
         "proxyUrl": {
-            "label": "Proxy URL",
-            "placeholder": "Enter proxy URL"
+            "label": "代理地址",
+            "placeholder": "请输入代理地址"
         },
         "statsSaveInterval": {
-            "label": "Stats Save Interval",
-            "placeholder": "Enter interval in minutes"
+            "label": "统计保存周期（分钟）",
+            "placeholder": "请输入周期（分钟）"
         },
         "corsAllowOrigins": {
-            "label": "CORS Allowed Origins",
-            "hint": "Empty = deny all, * = allow all",
-            "example": "Only allow specific domains: https://example.com,https://example2.com"
+            "label": "CORS 跨域白名单",
+            "hint": "为空禁止跨域，* 允许所有",
+            "example": "只允许指定域名: https://example.com,https://example2.com"
         },
-        "saved": "Saved",
+        "saved": "已保存",
         "backup": {
-            "title": "Backup / Restore",
+            "title": "备份 / 恢复",
             "export": {
-                "title": "Export",
-                "includeLogs": "Include Logs",
-                "includeStats": "Include Stats",
-                "button": "Download JSON",
-                "exporting": "Exporting...",
-                "success": "Export started"
+                "title": "导出",
+                "includeLogs": "包含日志",
+                "includeStats": "包含统计",
+                "button": "下载 JSON",
+                "exporting": "导出中...",
+                "success": "开始导出"
             },
             "import": {
-                "title": "Import (Incremental)",
-                "selected": "File selected",
-                "button": "Import JSON",
-                "importing": "Importing...",
-                "noFile": "Please select a JSON file first",
-                "success": "Import successful",
-                "failed": "Import failed",
-                "result": "Import result"
+                "title": "导入（增量）",
+                "selected": "已选择文件",
+                "button": "导入 JSON",
+                "importing": "导入中...",
+                "noFile": "请先选择 JSON 文件",
+                "success": "导入成功",
+                "failed": "导入失败",
+                "result": "导入结果"
             }
         },
         "apiKey": {
-            "title": "API Keys",
-            "empty": "No API keys",
-            "add": "Add Key",
-            "loadFailed": "Failed to load",
+            "title": "API 密钥",
+            "empty": "暂无 API 密钥",
+            "add": "添加密钥",
+            "loadFailed": "加载失败",
             "form": {
-                "name": "Name",
-                "maxCost": "Max Cost",
-                "maxCostPlaceholder": "Enter amount",
-                "unlimited": "Unlimited",
-                "expireAt": "Expire Date",
-                "selectDate": "Select date",
-                "neverExpire": "Never Expire",
-                "supportedModels": "Supported Models",
-                "noModels": "No models available",
-                "modelsHint": "Leave empty for unlimited",
-                "enabled": "Enabled",
-                "cancel": "Cancel",
-                "create": "Create",
-                "save": "Save",
-                "confirm": "Confirm"
+                "name": "名称",
+                "maxCost": "最大金额",
+                "maxCostPlaceholder": "请输入金额",
+                "unlimited": "无限制",
+                "expireAt": "过期日期",
+                "selectDate": "选择日期",
+                "neverExpire": "永不过期",
+                "supportedModels": "支持的模型",
+                "noModels": "暂无可选模型",
+                "modelsHint": "不选择则为无限制",
+                "enabled": "是否启用",
+                "cancel": "取消",
+                "create": "创建",
+                "save": "保存",
+                "confirm": "确认"
             },
             "stats": {
-                "noData": "No statistics available",
-                "inputToken": "Input Token",
-                "outputToken": "Output Token",
-                "inputCost": "Input Cost",
-                "outputCost": "Output Cost",
-                "requestSuccess": "Request Success",
-                "requestFailed": "Request Failed"
+                "noData": "暂无统计数据",
+                "inputToken": "输入 Token",
+                "outputToken": "输出 Token",
+                "inputCost": "输入费用",
+                "outputCost": "输出费用",
+                "requestSuccess": "成功请求",
+                "requestFailed": "失败请求"
             },
             "toast": {
-                "createSuccess": "API key created",
-                "createError": "Failed to create API key",
-                "updateSuccess": "API key updated",
-                "updateError": "Failed to update API key",
-                "deleteSuccess": "API key deleted",
-                "deleteError": "Failed to delete API key"
+                "createSuccess": "API 密钥创建成功",
+                "createError": "API 密钥创建失败",
+                "updateSuccess": "API 密钥更新成功",
+                "updateError": "API 密钥更新失败",
+                "deleteSuccess": "API 密钥删除成功",
+                "deleteError": "API 密钥删除失败"
             }
         },
         "llmPrice": {
-            "title": "Model Pricing",
+            "title": "模型价格",
             "updateInterval": {
-                "label": "Auto Update Interval (hours)",
-                "placeholder": "Enter interval in hours"
+                "label": "自动更新间隔（小时）",
+                "placeholder": "请输入间隔（小时）"
             },
             "manualUpdate": {
-                "label": "Manual Price Update",
-                "button": "Update Now",
-                "updating": "Updating..."
+                "label": "手动更新价格",
+                "button": "立即更新",
+                "updating": "更新中..."
             },
-            "lastUpdate": "Last Update",
-            "neverUpdated": "Never updated",
-            "updateSuccess": "Price updated successfully",
-            "updateFailed": "Failed to update price"
+            "lastUpdate": "上次更新",
+            "neverUpdated": "从未更新",
+            "updateSuccess": "价格更新成功",
+            "updateFailed": "价格更新失败"
         },
         "llmSync": {
-            "title": "Channel Sync",
+            "title": "渠道同步",
             "syncInterval": {
-                "label": "Auto Sync Interval (hours)",
-                "placeholder": "Enter interval in hours"
+                "label": "自动同步间隔（小时）",
+                "placeholder": "请输入间隔（小时）"
             },
             "manualSync": {
-                "label": "Manual Channel Sync",
-                "button": "Sync Now",
-                "syncing": "Syncing..."
+                "label": "手动同步渠道",
+                "button": "立即同步",
+                "syncing": "同步中..."
             },
-            "lastSync": "Last Sync",
-            "neverSynced": "Never synced",
-            "syncSuccess": "Channel synced successfully",
-            "syncFailed": "Failed to sync channel"
+            "lastSync": "上次同步",
+            "neverSynced": "从未同步",
+            "syncSuccess": "渠道同步成功",
+            "syncFailed": "渠道同步失败"
         },
         "account": {
-            "title": "Account Settings",
-            "save": "Save",
-            "saving": "Saving...",
+            "title": "账户设置",
+            "save": "保存",
+            "saving": "保存中...",
             "username": {
-                "label": "Change Username",
-                "placeholder": "Enter new username",
-                "empty": "Username cannot be empty",
-                "success": "Username changed successfully",
-                "failed": "Failed to change username"
+                "label": "修改用户名",
+                "placeholder": "请输入新用户名",
+                "empty": "用户名不能为空",
+                "success": "用户名修改成功",
+                "failed": "用户名修改失败"
             },
             "password": {
-                "label": "Change Password",
-                "oldPlaceholder": "Enter current password",
-                "newPlaceholder": "Enter new password",
-                "confirmPlaceholder": "Confirm new password",
-                "oldEmpty": "Please enter current password",
-                "newEmpty": "Please enter new password",
-                "mismatch": "Passwords do not match",
-                "tooShort": "Password must be at least 6 characters",
-                "change": "Change Password",
-                "success": "Password changed successfully",
-                "failed": "Failed to change password"
+                "label": "修改密码",
+                "oldPlaceholder": "请输入当前密码",
+                "newPlaceholder": "请输入新密码",
+                "confirmPlaceholder": "请确认新密码",
+                "oldEmpty": "请输入当前密码",
+                "newEmpty": "请输入新密码",
+                "mismatch": "两次输入的密码不一致",
+                "tooShort": "密码长度至少为6位",
+                "change": "修改密码",
+                "success": "密码修改成功",
+                "failed": "密码修改失败"
             }
         },
         "info": {
-            "title": "Version Info",
-            "currentVersion": "Current Version",
-            "latestVersion": "Latest Version",
-            "buildTime": "Build Time",
-            "publishedAt": "Published At",
-            "github": "GitHub Repository",
-            "unknown": "Unknown",
-            "versionMismatch": "Version Mismatch",
-            "versionMismatchHint": "Frontend version ({frontend}) does not match backend version ({backend}). This may be a browser cache issue. Please force refresh the page.",
-            "forceRefresh": "Force Refresh",
-            "newVersionAvailable": "New version available",
-            "newVersionAvailableHint": "Please backup your data first, then update the system",
-            "updateNow": "Update Now",
-            "updating": "Updating...",
-            "updateSuccess": "Update successful, service will restart shortly",
-            "updateFailed": "Update failed"
+            "title": "版本信息",
+            "currentVersion": "当前版本",
+            "latestVersion": "最新版本",
+            "buildTime": "构建时间",
+            "publishedAt": "发布时间",
+            "github": "GitHub 仓库",
+            "unknown": "未知",
+            "versionMismatch": "版本不匹配",
+            "versionMismatchHint": "前端版本 ({frontend}) 与后端版本 ({backend}) 不一致，可能是浏览器缓存问题，请强制刷新页面。",
+            "forceRefresh": "强制刷新",
+            "newVersionAvailable": "发现新版本可用",
+            "newVersionAvailableHint": "请先备份数据，然后更新系统",
+            "updateNow": "立即更新",
+            "updating": "更新中...",
+            "updateSuccess": "更新成功，服务即将重启",
+            "updateFailed": "更新失败"
         },
         "log": {
-            "title": "Log Settings",
+            "title": "日志设置",
             "enabled": {
-                "label": "Enable History Logs"
+                "label": "启用历史日志"
             },
             "keepPeriod": {
-                "label": "Log Retention (days)",
-                "placeholder": "Enter days"
+                "label": "日志保存天数",
+                "placeholder": "请输入天数"
             },
             "clear": {
-                "label": "Clear History Logs",
-                "button": "Clear",
-                "clearing": "Clearing..."
+                "label": "清空历史日志",
+                "button": "清空",
+                "clearing": "清空中..."
             },
-            "clearSuccess": "Logs cleared",
-            "clearFailed": "Failed to clear logs"
+            "clearSuccess": "日志已清空",
+            "clearFailed": "清空失败"
         }
     },
     "group": {
         "toast": {
-            "created": "Created successfully",
-            "createFailed": "Create failed",
-            "updated": "Updated successfully",
-            "updateFailed": "Update failed",
-            "deleted": "Deleted successfully",
-            "autoAddFailed": "Auto add failed"
+            "created": "创建成功",
+            "createFailed": "创建失败",
+            "updated": "更新成功",
+            "updateFailed": "更新失败",
+            "deleted": "删除成功",
+            "autoAddFailed": "自动添加失败"
         },
         "create": {
-            "title": "Create Group",
-            "submit": "Create",
-            "submitting": "Creating..."
+            "title": "创建分组",
+            "submit": "创建",
+            "submitting": "创建中..."
         },
         "card": {
-            "empty": "No rules"
+            "empty": "暂无规则"
         },
         "detail": {
             "actions": {
-                "edit": "Edit",
-                "cancel": "Cancel",
-                "save": "Save",
-                "copyName": "Copy Name",
-                "delete": "Delete",
-                "confirmDelete": "Confirm Delete"
+                "edit": "编辑",
+                "cancel": "取消",
+                "save": "保存",
+                "copyName": "复制名称",
+                "delete": "删除",
+                "confirmDelete": "确认删除"
             }
         },
         "form": {
-            "name": "Group Name",
-            "matchRegex": "Match Regex",
-            "matchRegexPlaceholder": "Leave empty to use default fuzzy match by group name",
-            "matchRegexInvalid": "Invalid regex",
-            "firstTokenTimeOut": "First Token Timeout",
-            "firstTokenTimeOutHint": "Unit: seconds, only effective for streaming response, 0 = no limit",
-            "items": "Selected Models",
-            "addItem": "Add Model",
-            "autoAdd": "Auto Add",
-            "clear": "Clear",
-            "selectChannel": "Channel",
-            "selectModel": "Model",
-            "searchPlaceholder": "Search channels or models..."
+            "name": "分组名称",
+            "matchRegex": "匹配正则",
+            "matchRegexPlaceholder": "留空则默认按分组名称模糊匹配",
+            "matchRegexInvalid": "正则无效",
+            "firstTokenTimeOut": "首字超时",
+            "firstTokenTimeOutHint": "单位秒，仅流式响应起效，0 表示不限制",
+            "items": "已选模型",
+            "addItem": "添加模型",
+            "autoAdd": "自动添加",
+            "clear": "清空",
+            "selectChannel": "渠道",
+            "selectModel": "模型",
+            "searchPlaceholder": "搜索渠道或模型..."
         },
         "mode": {
-            "roundRobin": "Round Robin",
-            "random": "Random",
-            "failover": "Failover",
-            "weighted": "Weighted"
+            "roundRobin": "轮询",
+            "random": "随机",
+            "failover": "故障转移",
+            "weighted": "加权分配"
         },
-        "empty": "No groups yet, click the button above to create one"
+        "empty": "暂无分组，点击左上角按钮创建"
     },
     "model": {
         "create": {
-            "title": "Create Model",
-            "name": "Model Name",
-            "input": "Input Price",
-            "output": "Output Price",
-            "cacheRead": "Cache Read",
-            "cacheWrite": "Cache Write",
-            "submit": "Create",
-            "submitting": "Creating..."
+            "title": "创建模型",
+            "name": "模型名称",
+            "input": "输入价格",
+            "output": "输出价格",
+            "cacheRead": "缓存读取",
+            "cacheWrite": "缓存写入",
+            "submit": "创建",
+            "submitting": "创建中..."
         },
         "toast": {
-            "updated": "Model price updated",
-            "updateFailed": "Update failed",
-            "deleted": "Model deleted",
-            "deleteFailed": "Delete failed"
+            "updated": "模型价格已更新",
+            "updateFailed": "更新失败",
+            "deleted": "模型已删除",
+            "deleteFailed": "删除失败"
         },
         "card": {
-            "inputCache": "Input/Cache",
-            "outputCache": "Output/Cache",
-            "edit": "Edit",
-            "delete": "Delete"
+            "inputCache": "输入/缓存",
+            "outputCache": "输出/缓存",
+            "edit": "编辑",
+            "delete": "删除"
         },
         "overlay": {
-            "cancel": "Cancel",
-            "deleting": "Deleting...",
-            "confirmDelete": "Confirm Delete",
-            "input": "Input",
-            "output": "Output",
-            "cacheRead": "Cache Read",
-            "cacheWrite": "Cache Write",
-            "save": "Save"
+            "cancel": "取消",
+            "deleting": "删除中...",
+            "confirmDelete": "确认删除",
+            "input": "输入",
+            "output": "输出",
+            "cacheRead": "缓存读取",
+            "cacheWrite": "缓存写入",
+            "save": "保存"
         }
     },
     "log": {
         "list": {
-            "noMore": "No more logs"
+            "noMore": "没有更多日志了"
         },
         "card": {
-            "error": "Error",
-            "errorInfo": "Error Info",
-            "firstToken": "TTFT",
-            "totalTime": "Total",
-            "input": "Input",
-            "output": "Output",
-            "cost": "Cost",
-            "requestContent": "Request Content",
-            "responseContent": "Response Content",
-            "noRequestContent": "(No request content)",
-            "noResponseContent": "(No response content)",
-            "firstTokenTime": "First Token Time",
+            "error": "错误",
+            "errorInfo": "错误信息",
+            "firstToken": "首字",
+            "totalTime": "总耗时",
+            "input": "输入",
+            "output": "输出",
+            "cost": "费用",
+            "requestContent": "请求内容",
+            "responseContent": "响应内容",
+            "noRequestContent": "(无请求内容)",
+            "noResponseContent": "(无响应内容)",
+            "firstTokenTime": "首字时间",
             "tokens": "tokens"
         }
     },
     "channel": {
-        "batchSync": {
-            "button": "Batch Sync",
-            "buttonMobile": "Sync",
-            "syncing": "Syncing",
-            "progress": "Syncing {current}/{total}",
-            "success": "Sync completed",
-            "successDetail": "Success: {success}, Failed: {failed}",
-            "failed": "Sync failed",
-            "noAutoSyncChannels": "No channels with auto-sync enabled"
-        },
-        "syncProgress": {
-            "title": "Sync Progress",
-            "completed": "Completed {current}/{total}",
-            "successCount": "Success: {count}",
-            "errorCount": "Failed: {count}",
-            "syncingCount": "Syncing: {count}",
-            "statusPending": "Pending",
-            "statusSyncing": "Syncing",
-            "statusSuccess": "Success",
-            "statusError": "Failed",
-            "close": "Close",
-            "syncing": "Syncing..."
-        },
         "card": {
-            "requestCount": "Requests",
-            "totalCost": "Total Cost",
+            "requestCount": "请求次数",
+            "totalCost": "总成本",
             "toast": {
-                "enabled": "Channel enabled",
-                "disabled": "Channel disabled"
+                "enabled": "渠道已启用",
+                "disabled": "渠道已禁用"
             }
         },
         "detail": {
             "title": {
-                "edit": "Edit Channel",
-                "view": "Channel Details"
+                "edit": "编辑渠道",
+                "view": "渠道详情"
             },
             "sections": {
-                "requests": "Request Details",
-                "tokens": "Token Usage",
-                "costs": "Cost Details",
+                "requests": "请求详情",
+                "tokens": "Token 使用",
+                "costs": "成本详情",
                 "baseUrls": "Base URLs",
-                "keys": "Keys"
+                "keys": "密钥"
             },
-            "noBaseUrls": "No Base URLs",
-            "noKeys": "No Keys",
+            "noBaseUrls": "暂无 Base URL",
+            "noKeys": "暂无密钥",
             "metrics": {
-                "totalRequests": "Total Requests",
-                "totalToken": "Total Tokens",
-                "totalCost": "Total Cost",
-                "successRequests": "Successful Requests",
-                "failedRequests": "Failed Requests",
-                "inputToken": "Input Tokens",
-                "outputToken": "Output Tokens",
-                "inputCost": "Input Cost",
-                "outputCost": "Output Cost",
-                "avgWaitTime": "Wait Time"
+                "totalRequests": "总请求",
+                "totalToken": "总 Token",
+                "totalCost": "总成本",
+                "successRequests": "成功请求",
+                "failedRequests": "失败请求",
+                "inputToken": "输入 Token",
+                "outputToken": "输出 Token",
+                "inputCost": "输入成本",
+                "outputCost": "输出成本",
+                "avgWaitTime": "等待时间"
             },
             "actions": {
-                "edit": "Edit",
-                "cancel": "Cancel",
-                "save": "Save",
-                "saving": "Saving...",
-                "delete": "Delete",
-                "confirmDelete": "Confirm Delete",
-                "deleting": "Deleting..."
+                "edit": "编辑",
+                "cancel": "取消",
+                "save": "保存",
+                "saving": "保存中...",
+                "delete": "删除",
+                "confirmDelete": "确认删除",
+                "deleting": "删除中..."
             }
         },
         "create": {
-            "dialogTitle": "Create New Channel",
-            "submit": "Create Channel",
-            "submitting": "Creating..."
+            "dialogTitle": "创建新渠道",
+            "submit": "创建渠道",
+            "submitting": "创建中..."
         },
-    "form": {
-      "add": "Add",
-      "name": "Channel Name",
-      "type": "Channel Type",
-      "baseUrls": "Base URLs",
-      "baseUrlUrl": "URL",
-            "baseUrlDelay": "Delay(ms)",
-            "advanced": "Advanced Settings",
+        "form": {
+            "add": "添加",
+            "name": "渠道名称",
+            "type": "渠道类型",
+            "baseUrls": "Base URLs",
+            "baseUrlUrl": "地址",
+            "baseUrlDelay": "延迟(ms)",
+            "advanced": "高级设置",
             "apiKey": "API Key",
-            "customHeader": "Custom Headers",
+            "customHeader": "自定义 Header",
             "customHeaderKey": "Header Key",
             "customHeaderValue": "Header Value",
-            "customHeaderAdd": "Add Header",
-            "channelProxy": "Channel Proxy",
-            "channelProxyPlaceholder": "Optional: proxy for this channel (overrides global proxy)",
-            "paramOverride": "Param Override",
-            "paramOverridePlaceholder": "Optional: JSON string to override request params",
-            "model": "Model",
-            "enabled": "Enabled",
-            "proxy": "Use Proxy",
-            "modelCustomPlaceholder": "Custom model name",
-            "modelAdd": "Add",
-            "modelRefresh": "Refresh",
-            "modelRefreshSuccess": "Models fetched successfully",
-            "modelRefreshFailed": "Failed to fetch models",
-            "modelRefreshEmpty": "No models found",
-            "modelSelected": "Selected Models",
-            "modelNoSelected": "No models selected",
-            "modelClearAll": "Clear All",
+            "customHeaderAdd": "添加 Header",
+            "channelProxy": "渠道代理",
+            "channelProxyPlaceholder": "可选：仅对该渠道生效（覆盖全局代理）",
+            "paramOverride": "参数覆盖",
+            "paramOverridePlaceholder": "可选：JSON 字符串，用于覆盖请求参数",
+            "model": "模型",
+            "enabled": "启用",
+            "proxy": "使用代理",
+            "modelCustomPlaceholder": "自定义模型名称",
+            "modelAdd": "添加",
+            "modelRefresh": "刷新",
+            "modelRefreshSuccess": "模型列表获取成功",
+            "modelRefreshFailed": "模型列表获取失败",
+            "modelRefreshEmpty": "未获取到模型列表",
+            "modelSelected": "已选模型",
+            "modelNoSelected": "暂未选择模型",
+            "modelClearAll": "清除全部",
             "typeOpenAIChat": "OpenAI Chat",
             "typeOpenAIResponse": "OpenAI Response",
-            "typeOpenAIEmbedding": "OpenAI Embedding",
             "typeAnthropic": "Anthropic",
             "typeGemini": "Gemini",
-            "typeVolcengine": "Volcengine",
-            "autoSync": "Auto Sync",
-            "autoGroup": "Auto Group",
-            "autoGroupNone": "None",
-            "autoGroupFuzzy": "Fuzzy",
-            "autoGroupExact": "Exact",
-            "autoGroupRegex": "Regex",
-      "matchRegex": "Match Regex",
-      "matchRegexPlaceholder": "Optional: regex pattern to match request model names",
-      "remark": "Remark",
-      "keyPool": "Key Pool Mode",
-      "keyPoolDesc": "For massive keys; auto rotate and disable failing keys",
-      "keyFailThreshold": "Failure threshold (auto disable)",
-      "keyPoolTools": "Key Pool Import & Maintenance",
-      "keyPoolPaste": "Paste keys here, one per line",
-      "import": "Import Keys",
-      "restoreInvalid": "Restore Disabled Keys",
-      "clearInvalid": "Clear Disabled Keys",
-      "importSuccess": "Import done: added {added}, skipped {skipped}",
-      "restoreSuccess": "Restored {count} disabled keys",
-      "clearSuccess": "Cleared {count} disabled keys"
+            "typeVolcengine": "火山引擎",
+            "autoSync": "自动同步",
+            "autoGroup": "自动分组",
+            "autoGroupNone": "不自动分组",
+            "autoGroupFuzzy": "模糊匹配",
+            "autoGroupExact": "准确匹配",
+            "autoGroupRegex": "正则匹配",
+            "clearInvalid": "??????",
+            "clearSuccess": "??? {count} ?????",
+            "import": "????",
+            "importSuccess": "??????? {added}??? {skipped}",
+            "keyFailThreshold": "??????????",
+            "keyPool": "?????",
+            "keyPoolDesc": "???????????????????",
+            "keyPoolPaste": "???????????",
+            "keyPoolTools": "????????",
+            "matchRegex": "????",
+            "matchRegexPlaceholder": "????????????????",
+            "remark": "??",
+            "restoreInvalid": "??????",
+            "restoreSuccess": "??? {count} ?????",
+            "typeOpenAIEmbedding": "OpenAI Embedding",
+            "disabled": "??"
+        },
+        "batchSync": {
+            "button": "????",
+            "buttonMobile": "??",
+            "syncing": "???",
+            "progress": "??? {current}/{total}",
+            "success": "????",
+            "successDetail": "?? {success}??? {failed}",
+            "failed": "????",
+            "noAutoSyncChannels": "???????????"
+        },
+        "syncProgress": {
+            "title": "????",
+            "completed": "??? {current}/{total}",
+            "successCount": "???{count}",
+            "errorCount": "???{count}",
+            "syncingCount": "????{count}",
+            "statusPending": "???",
+            "statusSyncing": "???",
+            "statusSuccess": "??",
+            "statusError": "??",
+            "close": "??",
+            "syncing": "???..."
+        }
     }
-  }
 }
