@@ -250,7 +250,7 @@ export function KeyPool() {
         setValidateStart(Date.now());
         setValidateProgress({ state: 'running', tested: 0, success: 0, disabled: 0, total: 0 });
 
-        startValidateChannelKeys({ channel_id: selectedChannelId, model, timeout: 15, concurrency: 3 })
+        startValidateChannelKeys({ channel_id: selectedChannelId, model, timeout: 15, concurrency: 2 })
             .then((res) => {
                 const { job_id, total } = res;
                 setValidateJobId(job_id);
@@ -291,7 +291,7 @@ export function KeyPool() {
                         setValidateStart(null);
                         setValidateElapsed(0);
                     }
-                }, 2000);
+                }, 3000);
             })
             .catch((error) => {
                 setValidateStart(null);

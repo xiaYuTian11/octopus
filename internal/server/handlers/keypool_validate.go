@@ -297,15 +297,15 @@ func ValidateKeysStartHandler(c *gin.Context) {
 		job.setState(validateJobStateRunning, "")
 		if err := runValidateJob(jobCtx, job, ch); err != nil {
 			if job.State == validateJobStateCanceled {
-				scheduleValidateJobCleanup(job.ID, 10*time.Minute)
+				scheduleValidateJobCleanup(job.ID, 5*time.Minute)
 				return
 			}
 			job.setState(validateJobStateError, err.Error())
-			scheduleValidateJobCleanup(job.ID, 10*time.Minute)
+			scheduleValidateJobCleanup(job.ID, 5*time.Minute)
 			return
 		}
 		job.setState(validateJobStateSuccess, "")
-		scheduleValidateJobCleanup(job.ID, 10*time.Minute)
+		scheduleValidateJobCleanup(job.ID, 5*time.Minute)
 	}()
 
 	resp.Success(c, gin.H{
@@ -362,7 +362,7 @@ func ValidateKeysCancelHandler(c *gin.Context) {
 	if job.cancel != nil {
 		job.cancel()
 	}
-	scheduleValidateJobCleanup(job.ID, 10*time.Minute)
+	scheduleValidateJobCleanup(job.ID, 5*time.Minute)
 	resp.Success(c, gin.H{"canceled": true})
 }
 
