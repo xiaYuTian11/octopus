@@ -996,3 +996,16 @@ func ChannelKeysPage(ctx context.Context, channelID int, page, pageSize int, ena
 	}
 	return keys, total, nil
 }
+
+// DeleteDisabledChannelKeys 删除指定渠道的所有禁用密钥
+func DeleteDisabledChannelKeys(ctx context.Context, channelID int64) (int64, error) {
+	result := db.GetDB().WithContext(ctx).
+		Where("channel_id = ? AND enabled = ?", channelID, false).
+		Delete(&model.ChannelKey{})
+	if result.Error != nil {
+		return 0, result.Error
+	}
+	// 刷新缓存
+	_ = channelRefreshCacheByID(int(channelID), ctx)
+	return result.RowsAffected, nil
+}

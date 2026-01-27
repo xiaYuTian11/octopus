@@ -132,6 +132,7 @@ export type UpdateChannelRequest = {
 };
 
 export type FetchModelRequest = {
+    id?: number;
     type: ChannelType;
     base_urls: BaseUrl[];
     keys: Array<Pick<ChannelKey, 'enabled' | 'channel_key'>>;
@@ -340,6 +341,85 @@ export function useFetchModel() {
     });
 }
 
+export type ChannelModelWatch = {
+    id: number;
+    channel_id: number;
+    model_name: string;
+    webhook_url: string;
+    secret: string;
+    dedup_minutes: number;
+    enabled: boolean;
+    last_notified_at?: string | null;
+    created_at: string;
+    updated_at: string;
+};
+
+export type ChannelModelWatchCreateRequest = {
+    channel_id: number;
+    model_name: string;
+    webhook_url: string;
+    secret?: string;
+    dedup_minutes?: number;
+    enabled?: boolean;
+};
+
+export type ChannelModelWatchUpdateRequest = {
+    id: number;
+    channel_id?: number;
+    model_name?: string;
+    webhook_url?: string;
+    secret?: string;
+    dedup_minutes?: number;
+    enabled?: boolean;
+};
+
+export function useChannelModelWatchList(channelId?: number) {
+    return useQuery({
+        queryKey: ['channel', 'model-watch', channelId ?? 'all'],
+        queryFn: async () => {
+            const params = channelId ? { channel_id: channelId } : undefined;
+            return apiClient.get<ChannelModelWatch[]>('/api/v1/channel/watch/list', params as any);
+        },
+        refetchInterval: 30000,
+    });
+}
+
+export function useCreateChannelModelWatch() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (data: ChannelModelWatchCreateRequest) => {
+            return apiClient.post<ChannelModelWatch>('/api/v1/channel/watch/create', data);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['channel', 'model-watch'] });
+        },
+    });
+}
+
+export function useUpdateChannelModelWatch() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (data: ChannelModelWatchUpdateRequest) => {
+            return apiClient.post<ChannelModelWatch>('/api/v1/channel/watch/update', data);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['channel', 'model-watch'] });
+        },
+    });
+}
+
+export function useDeleteChannelModelWatch() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (id: number) => {
+            return apiClient.delete<null>(`/api/v1/channel/watch/delete/${id}`);
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['channel', 'model-watch'] });
+        },
+    });
+}
+
 /**
  * 获取渠道最后同步时间 Hook
  * 
@@ -514,6 +594,31 @@ export function useClearInvalidChannelKeys() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['channels', 'list'] });
+        },
+    });
+}
+
+/**
+ * 删除渠道所有禁用密钥 Hook
+ *
+ * @example
+ * const deleteDisabledKeys = useDeleteDisabledKeys();
+ *
+ * deleteDisabledKeys.mutate(channelId);
+ */
+export function useDeleteDisabledKeys() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: async (channelId: number) => {
+            return apiClient.delete<{ deleted: number }>(`/api/v1/channel/keys/delete-disabled/${channelId}`);
+        },
+        onSuccess: () => {
+            logger.log('禁用密钥删除成功');
+            queryClient.invalidateQueries({ queryKey: ['channels', 'list'] });
+            queryClient.invalidateQueries({ queryKey: ['channel', 'keys'] });
+        },
+        onError: (error) => {
+            logger.error('禁用密钥删除失败:', error);
         },
     });
 }

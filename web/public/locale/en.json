@@ -302,7 +302,33 @@
             },
             "clearSuccess": "Logs cleared",
             "clearFailed": "Failed to clear logs"
-        }
+        },
+        "channelModelWatch": {
+            "title": "Channel Model Webhook",
+            "listTitle": "Current rules",
+            "empty": "No webhook rules yet",
+            "dedupTip": "Deduplicate within {minutes} minutes",
+            "lastNotified": "Last notified: {time}",
+            "never": "Never",
+            "deleted": "Rule deleted",
+            "form": {
+                "channel": "Channel",
+                "channelPlaceholder": "Select channel",
+                "model": "Model name",
+                "webhook": "Webhook URL",
+                "secret": "Signature secret (optional)",
+                "secretPlaceholder": "Optional, used for HMAC signature",
+                "dedup": "Dedup window (minutes)",
+                "enabled": "Enabled",
+                "enabledDesc": "Send webhook when target model appears",
+                "create": "Add rule",
+                "creating": "Creating...",
+                "created": "Rule created",
+                "createFailed": "Failed to create rule",
+                "missingRequired": "Please fill channel, model and webhook URL"
+            }
+        },
+        "loading": "Loading..."
     },
     "group": {
         "toast": {
@@ -536,6 +562,9 @@
             "import": "Import Keys",
             "restoreInvalid": "Restore Disabled Keys",
             "clearInvalid": "Clear Disabled Keys",
+            "deleteDisabledKeys": "Remove Disabled Keys",
+            "deleteDisabledKeysConfirm": "Are you sure you want to remove all disabled keys? This action cannot be undone.",
+            "deletedKeysCount": "Removed {count} disabled keys",
             "importSuccess": "Import done: added {added}, skipped {skipped}",
             "restoreSuccess": "Restored {count} disabled keys",
             "clearSuccess": "Cleared {count} disabled keys",

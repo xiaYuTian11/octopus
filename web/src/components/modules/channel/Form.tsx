@@ -151,6 +151,7 @@ export function ChannelForm({
         }
         fetchModel.mutate(
             {
+                id: channelId,
                 type: formData.type,
                 base_urls: formData.base_urls,
                 keys: keysForFetch,

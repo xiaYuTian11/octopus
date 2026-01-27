@@ -14,6 +14,8 @@ import (
 	"github.com/bestruirui/octopus/internal/server/resp"
 	"github.com/bestruirui/octopus/internal/server/router"
 	"github.com/bestruirui/octopus/internal/task"
+	"github.com/bestruirui/octopus/internal/utils/diff"
+	"github.com/bestruirui/octopus/internal/utils/xstrings"
 	"github.com/gin-gonic/gin"
 )
 
@@ -76,6 +78,10 @@ func init() {
 		AddRoute(
 			router.NewRoute("/keys/clear-invalid", http.MethodPost).
 				Handle(clearInvalidChannelKeys),
+		).
+		AddRoute(
+			router.NewRoute("/keys/delete-disabled/:id", http.MethodDelete).
+				Handle(deleteDisabledKeys),
 		)
 	router.NewGroupRouter("/api/v1/channel").
 		Use(middleware.Auth()).
@@ -274,6 +280,24 @@ func clearInvalidChannelKeys(c *gin.Context) {
 	}
 	resp.Success(c, gin.H{"cleared": count})
 }
+
+// deleteDisabledKeys 删除渠道的所有禁用密钥
+func deleteDisabledKeys(c *gin.Context) {
+	channelID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		resp.Error(c, http.StatusBadRequest, "invalid channel id")
+		return
+	}
+
+	count, err := op.DeleteDisabledChannelKeys(c.Request.Context(), channelID)
+	if err != nil {
+		resp.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	resp.Success(c, gin.H{"deleted": count})
+}
+
 func fetchModel(c *gin.Context) {
 	var request model.Channel
 	if err := c.ShouldBindJSON(&request); err != nil {
@@ -284,6 +308,11 @@ func fetchModel(c *gin.Context) {
 	if err != nil {
 		resp.Error(c, http.StatusInternalServerError, err.Error())
 		return
+	}
+	if request.ID > 0 && len(models) > 0 {
+		if ch, err := op.ChannelGet(request.ID, c.Request.Context()); err == nil {
+			helper.NotifyChannelModelWatch(c.Request.Context(), *ch, models, models, "manual_refresh")
+		}
 	}
 	resp.Success(c, models)
 }
@@ -322,6 +351,7 @@ func syncSingleChannel(c *gin.Context) {
 		return
 	}
 
+	oldModels := xstrings.SplitTrimCompact(",", channel.Model)
 	fetchModels, err := helper.FetchModels(ctx, *channel)
 	if err != nil {
 		resp.Error(c, http.StatusInternalServerError, err.Error())
@@ -330,6 +360,7 @@ func syncSingleChannel(c *gin.Context) {
 
 	// 更新渠道模型
 	newModels := strings.Join(fetchModels, ",")
+	channel.Model = newModels
 	if _, err := op.ChannelUpdate(&model.ChannelUpdateRequest{
 		ID:    channel.ID,
 		Model: &newModels,
@@ -341,6 +372,11 @@ func syncSingleChannel(c *gin.Context) {
 	// 自动分组
 	if len(fetchModels) > 0 {
 		helper.ChannelAutoGroup(channel, ctx)
+	}
+
+	_, addedModels := diff.Diff(oldModels, fetchModels)
+	if len(addedModels) > 0 {
+		helper.NotifyChannelModelWatch(ctx, *channel, addedModels, fetchModels, "manual_sync")
 	}
 
 	resp.Success(c, nil)

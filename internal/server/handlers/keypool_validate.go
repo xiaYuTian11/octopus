@@ -206,10 +206,11 @@ func ValidateKeysHandler(c *gin.Context) {
 		}()
 	}
 
+	enabledOnly := true
 	page := 1
 	pageSize := 500 // 更小分页，降低内存峰值
 	for {
-		keys, _, err := op.ChannelKeysPage(ctx, req.ChannelID, page, pageSize, nil)
+		keys, _, err := op.ChannelKeysPage(ctx, req.ChannelID, page, pageSize, &enabledOnly)
 		if err != nil {
 			close(jobs)
 			wg.Wait()
@@ -274,7 +275,8 @@ func ValidateKeysStartHandler(c *gin.Context) {
 		return
 	}
 
-	total, err := op.ChannelKeysCount(c.Request.Context(), req.ChannelID, nil)
+	enabledOnly := true
+	total, err := op.ChannelKeysCount(c.Request.Context(), req.ChannelID, &enabledOnly)
 	if err != nil {
 		resp.Error(c, http.StatusInternalServerError, err.Error())
 		return
@@ -438,10 +440,11 @@ func runValidateJob(ctx context.Context, job *validateJob, ch *model.Channel) er
 		}()
 	}
 
+	enabledOnly := true
 	page := 1
 	pageSize := 500 // 更小分页，降低内存峰值
 	for {
-		keys, _, err := op.ChannelKeysPage(ctx, job.ChannelID, page, pageSize, nil)
+		keys, _, err := op.ChannelKeysPage(ctx, job.ChannelID, page, pageSize, &enabledOnly)
 		if err != nil {
 			close(jobs)
 			wg.Wait()

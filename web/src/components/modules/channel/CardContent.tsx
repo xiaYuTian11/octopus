@@ -11,7 +11,7 @@ import {
     Globe,
     Key
 } from 'lucide-react';
-import { useUpdateChannel, useDeleteChannel, type Channel, type UpdateChannelRequest, useImportChannelKeys, useRestoreInvalidChannelKeys, useClearInvalidChannelKeys } from '@/api/endpoints/channel';
+import { useUpdateChannel, useDeleteChannel, type Channel, type UpdateChannelRequest, useImportChannelKeys, useRestoreInvalidChannelKeys, useClearInvalidChannelKeys, useDeleteDisabledKeys } from '@/api/endpoints/channel';
 import {
     MorphingDialogTitle,
     MorphingDialogDescription,
@@ -37,8 +37,10 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
     const importKeys = useImportChannelKeys();
     const restoreKeys = useRestoreInvalidChannelKeys();
     const clearKeys = useClearInvalidChannelKeys();
+    const deleteDisabledKeys = useDeleteDisabledKeys();
     const [isEditing, setIsEditing] = useState(false);
     const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+    const [isConfirmingDeleteDisabled, setIsConfirmingDeleteDisabled] = useState(false);
     const [poolText, setPoolText] = useState('');
     const [formData, setFormData] = useState<ChannelFormData>({
         name: channel.name,
@@ -220,6 +222,24 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                 onError: (error) => toast.error(error.message ?? 'Clear failed'),
             }
         );
+    };
+
+    const handleDeleteDisabledKeys = () => {
+        if (!formData.key_pool_enabled || !channel.id) return;
+        if (!isConfirmingDeleteDisabled) {
+            setIsConfirmingDeleteDisabled(true);
+            return;
+        }
+        deleteDisabledKeys.mutate(channel.id, {
+            onSuccess: (res) => {
+                toast.success(tForm('deletedKeysCount', { count: res.deleted ?? 0 }));
+                setIsConfirmingDeleteDisabled(false);
+            },
+            onError: (error) => {
+                toast.error(error.message ?? 'Delete failed');
+                setIsConfirmingDeleteDisabled(false);
+            },
+        });
     };
 
     return (
@@ -545,6 +565,19 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
                                             className="rounded-xl"
                                         >
                                             {clearKeys.isPending ? t('actions.saving') : tForm('clearInvalid')}
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            variant={isConfirmingDeleteDisabled ? 'destructive' : 'outline'}
+                                            onClick={handleDeleteDisabledKeys}
+                                            disabled={deleteDisabledKeys.isPending}
+                                            className="rounded-xl"
+                                        >
+                                            {deleteDisabledKeys.isPending
+                                                ? t('actions.saving')
+                                                : isConfirmingDeleteDisabled
+                                                    ? t('actions.confirmDelete')
+                                                    : tForm('deleteDisabledKeys')}
                                         </Button>
                                     </div>
                                 </div>

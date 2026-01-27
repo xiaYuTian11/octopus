@@ -68,6 +68,9 @@ func SyncModelsTask() {
 				log.Errorf("failed to update channel %s: %v", channel.Name, err)
 				continue
 			}
+			if len(addedModels) > 0 {
+				helper.NotifyChannelModelWatch(ctx, channel, addedModels, newModels, "auto_sync")
+			}
 		}
 		// 批量删除消失的模型对应的 GroupItem
 		if len(deletedModels) > 0 {

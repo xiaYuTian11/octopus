@@ -10,6 +10,7 @@ import { SettingInfo } from './Info';
 import { SettingLLMSync } from './LLMSync';
 import { SettingLog } from './Log';
 import { SettingBackup } from './Backup';
+import { SettingChannelModelWatch } from './ChannelModelWatch';
 
 export function Setting() {
     return (
@@ -37,6 +38,9 @@ export function Setting() {
             </div>
             <div>
                 <SettingLLMSync key="setting-llmsync" />
+            </div>
+            <div>
+                <SettingChannelModelWatch key="setting-channel-model-watch" />
             </div>
             <div>
                 <SettingBackup key="setting-backup" />

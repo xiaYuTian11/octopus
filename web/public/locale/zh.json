@@ -302,7 +302,33 @@
             },
             "clearSuccess": "日志已清空",
             "clearFailed": "清空失败"
-        }
+        },
+        "channelModelWatch": {
+            "title": "模型监控 Webhook",
+            "listTitle": "已配置规则",
+            "empty": "还没有 webhook 规则",
+            "dedupTip": "{minutes} 分钟内去重通知",
+            "lastNotified": "上次通知：{time}",
+            "never": "从未",
+            "deleted": "规则已删除",
+            "form": {
+                "channel": "渠道",
+                "channelPlaceholder": "选择渠道",
+                "model": "模型名称",
+                "webhook": "Webhook 地址",
+                "secret": "签名密钥（可选）",
+                "secretPlaceholder": "可选，用于 HMAC 签名",
+                "dedup": "去重窗口（分钟）",
+                "enabled": "启用",
+                "enabledDesc": "当刷新命中目标模型时发送 webhook",
+                "create": "新增规则",
+                "creating": "创建中...",
+                "created": "创建成功",
+                "createFailed": "创建失败",
+                "missingRequired": "请填写渠道、模型和 webhook 地址"
+            }
+        },
+        "loading": "加载中..."
     },
     "group": {
         "toast": {
@@ -536,6 +562,9 @@
             "import": "导入密钥",
             "restoreInvalid": "恢复已禁用密钥",
             "clearInvalid": "清理已禁用密钥",
+            "deleteDisabledKeys": "移除禁用密钥",
+            "deleteDisabledKeysConfirm": "确定要移除所有禁用的密钥吗？此操作不可恢复。",
+            "deletedKeysCount": "已移除 {count} 个禁用密钥",
             "importSuccess": "导入完成：新增 {added}，跳过 {skipped}",
             "restoreSuccess": "已恢复 {count} 个禁用密钥",
             "clearSuccess": "已清理 {count} 个禁用密钥",
