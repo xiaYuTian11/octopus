@@ -39,12 +39,13 @@ func Handler(inboundType inbound.InboundType, c *gin.Context) {
 	}
 
 	// Optional precheck (explicit trigger only).
-	if handled, err := maybeHandlePrecheck(c, internalRequest, inAdapter); err != nil {
-		resp.Error(c, http.StatusInternalServerError, err.Error())
-		return
-	} else if handled {
-		return
-	}
+	// TODO: 前置校验功能暂时禁用，如需恢复请取消下方注释
+	// if handled, err := maybeHandlePrecheck(c, internalRequest, inAdapter); err != nil {
+	// 	resp.Error(c, http.StatusInternalServerError, err.Error())
+	// 	return
+	// } else if handled {
+	// 	return
+	// }
 
 	// 初始化统计和日志
 	apiKeyID := c.GetInt("api_key_id")
