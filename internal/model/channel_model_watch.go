@@ -10,9 +10,9 @@ import (
 // ChannelModelWatch 用于监听渠道新增模型并发送 webhook 的配置。
 type ChannelModelWatch struct {
 	ID             int        `json:"id" gorm:"primaryKey"`
-	ChannelID      int        `json:"channel_id" gorm:"index:idx_channel_model_webhook,unique;not null"`
-	ModelName      string     `json:"model_name" gorm:"size:255;not null;index:idx_channel_model_webhook,unique"`
-	WebhookURL     string     `json:"webhook_url" gorm:"size:1024;not null;index:idx_channel_model_webhook,unique"`
+	ChannelID      int        `json:"channel_id" gorm:"uniqueIndex:idx_channel_model_webhook,priority:1;not null"`
+	ModelName      string     `json:"model_name" gorm:"size:255;not null;uniqueIndex:idx_channel_model_webhook,priority:2,length:191"`
+	WebhookURL     string     `json:"webhook_url" gorm:"size:1024;not null;uniqueIndex:idx_channel_model_webhook,priority:3,length:191"`
 	Secret         string     `json:"secret" gorm:"size:255"`
 	DedupMinutes   int        `json:"dedup_minutes" gorm:"default:60"`
 	Enabled        bool       `json:"enabled" gorm:"default:true"`
