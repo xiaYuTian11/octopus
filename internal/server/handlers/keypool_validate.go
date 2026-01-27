@@ -4,20 +4,22 @@ import (
 	"context"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/bestruirui/octopus/internal/helper"
 	"github.com/bestruirui/octopus/internal/model"
 	"github.com/bestruirui/octopus/internal/op"
 	"github.com/bestruirui/octopus/internal/server/resp"
+	"github.com/bestruirui/octopus/internal/utils/log"
 	"github.com/gin-gonic/gin"
 )
 
 type validateKeysRequest struct {
-	ChannelID int     `json:"channel_id" binding:"required"`
-	Model     string  `json:"model" binding:"required"`  // 用于请求的目标模型
-	Timeout   float64 `json:"timeout,omitempty"`         // 单 Key 超时（秒），默认 10
-	Concurrency int   `json:"concurrency,omitempty"`     // 并发数，默认 5，最大 20
+	ChannelID   int     `json:"channel_id" binding:"required"`
+	Model       string  `json:"model" binding:"required"` // 用于请求的目标模型
+	Timeout     float64 `json:"timeout,omitempty"`        // 单 Key 超时（秒），默认 10
+	Concurrency int     `json:"concurrency,omitempty"`    // 并发数，默认 5，最大 20
 }
 
 type validateKeysResult struct {
@@ -64,14 +66,76 @@ func ValidateKeysHandler(c *gin.Context) {
 		return
 	}
 
-	tested, disabled, success := 0, 0, 0
-	var mu sync.Mutex
-	sem := make(chan struct{}, concurrency)
+	var tested, disabled, success int64
+	ctx := c.Request.Context()
+	jobs := make(chan model.ChannelKey, concurrency*2)
+
+	worker := func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Errorf("validate key panic: %v", r)
+			}
+		}()
+		for k := range jobs {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+
+			if !k.Enabled {
+				continue
+			}
+
+			atomic.AddInt64(&tested, 1)
+
+			// 跳过明显无效的短 key
+			if len(k.ChannelKey) < 8 {
+				k.Enabled = false
+				k.DisabledReason = "too short key"
+				_ = op.ChannelKeyUpdateImmediate(ctx, k)
+				atomic.AddInt64(&disabled, 1)
+				continue
+			}
+
+			keyCtx, cancel := context.WithTimeout(ctx, timeout)
+			testErr := validateSingleKey(keyCtx, ch, k, req.Model)
+			cancel()
+
+			k.LastUseTimeStamp = time.Now().Unix()
+			if testErr != nil {
+				k.Enabled = false
+				k.DisabledReason = testErr.Error()
+				_ = op.ChannelKeyUpdateImmediate(ctx, k)
+				atomic.AddInt64(&disabled, 1)
+			} else {
+				// 成功则重置失败计数并确保启用
+				k.Enabled = true
+				k.FailureCount = 0
+				k.StatusCode = 200
+				k.DisabledReason = ""
+				_ = op.ChannelKeyUpdateImmediate(ctx, k)
+				atomic.AddInt64(&success, 1)
+			}
+		}
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < concurrency; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			worker()
+		}()
+	}
+
 	page := 1
 	pageSize := 5000
 	for {
-		keys, _, err := op.ChannelKeysPage(c.Request.Context(), req.ChannelID, page, pageSize, nil)
+		keys, _, err := op.ChannelKeysPage(ctx, req.ChannelID, page, pageSize, nil)
 		if err != nil {
+			close(jobs)
+			wg.Wait()
 			resp.Error(c, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -79,66 +143,27 @@ func ValidateKeysHandler(c *gin.Context) {
 			break
 		}
 
-		var wg sync.WaitGroup
 		for _, key := range keys {
-			k := key
-			wg.Add(1)
-			sem <- struct{}{}
-			go func() {
-				defer wg.Done()
-				defer func() { <-sem }()
-
-				if !k.Enabled {
-					// 已经禁用的跳过，避免无效调用
-					return
-				}
-				mu.Lock()
-				tested++
-				mu.Unlock()
-
-				// 跳过明显占位 key
-				if len(k.ChannelKey) < 8 {
-					k.Enabled = false
-					k.DisabledReason = "too short key"
-					_ = op.ChannelKeyUpdateImmediate(c.Request.Context(), k)
-					mu.Lock()
-					disabled++
-					mu.Unlock()
-					return
-				}
-
-				ctx, cancel := context.WithTimeout(c.Request.Context(), timeout)
-				testErr := validateSingleKey(ctx, ch, k, req.Model)
-				cancel()
-
-				if testErr != nil {
-					k.Enabled = false
-					k.DisabledReason = testErr.Error()
-					_ = op.ChannelKeyUpdateImmediate(c.Request.Context(), k)
-					mu.Lock()
-					disabled++
-					mu.Unlock()
-				} else {
-					// 标记成功，重置失败次数
-					k.FailureCount = 0
-					k.StatusCode = 200
-					k.DisabledReason = ""
-					_ = op.ChannelKeyUpdateImmediate(c.Request.Context(), k)
-					mu.Lock()
-					success++
-					mu.Unlock()
-				}
-			}()
+			select {
+			case <-ctx.Done():
+				close(jobs)
+				wg.Wait()
+				resp.Error(c, http.StatusRequestTimeout, "request canceled")
+				return
+			case jobs <- key:
+			}
 		}
-		wg.Wait()
 
 		page++
 	}
 
+	close(jobs)
+	wg.Wait()
+
 	resp.Success(c, validateKeysResult{
-		Tested:   tested,
-		Disabled: disabled,
-		Success:  success,
+		Tested:   int(tested),
+		Disabled: int(disabled),
+		Success:  int(success),
 	})
 }
 
