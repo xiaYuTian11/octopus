@@ -51,8 +51,9 @@ export function KeyPool() {
     const [validateStart, setValidateStart] = useState<number | null>(null);
     const [validateElapsed, setValidateElapsed] = useState<number>(0);
     const [validateJobId, setValidateJobId] = useState<string | null>(null);
+    type ValidateState = 'idle' | 'pending' | 'running' | 'success' | 'error' | 'canceled';
     const [validateProgress, setValidateProgress] = useState<{
-        state: 'idle' | 'running' | 'success' | 'error' | 'canceled';
+        state: ValidateState;
         tested: number;
         success: number;
         disabled: number;
@@ -260,7 +261,7 @@ export function KeyPool() {
                     try {
                         const status = await getValidateJobStatus(job_id);
                         setValidateProgress({
-                            state: status.state,
+                            state: (status.state as ValidateState) || 'pending',
                             tested: status.tested,
                             success: status.success,
                             disabled: status.disabled,
