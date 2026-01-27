@@ -415,6 +415,7 @@ export type ValidateChannelKeysRequest = {
     model: string;
     timeout?: number;
     concurrency?: number;
+    mode?: string;
 };
 
 export type ValidateChannelKeysResponse = {

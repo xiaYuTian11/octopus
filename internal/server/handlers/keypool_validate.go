@@ -12,9 +12,12 @@ import (
 	"github.com/bestruirui/octopus/internal/model"
 	"github.com/bestruirui/octopus/internal/op"
 	"github.com/bestruirui/octopus/internal/server/resp"
+	transformerModel "github.com/bestruirui/octopus/internal/transformer/model"
 	"github.com/bestruirui/octopus/internal/utils/log"
 	"github.com/gin-gonic/gin"
 )
+
+func ptr[T any](v T) *T { return &v }
 
 type validateJobState string
 
@@ -31,6 +34,7 @@ type validateKeysRequest struct {
 	Model       string  `json:"model" binding:"required"` // 用于请求的目标模型
 	Timeout     float64 `json:"timeout,omitempty"`        // 单 Key 超时（秒），默认 10
 	Concurrency int     `json:"concurrency,omitempty"`    // 并发数，默认 5，最大 20
+	Mode        string  `json:"mode,omitempty"`           // validate 模式：list（默认，仅 /models）或 chat（真实调用）
 }
 
 type validateKeysResult struct {
@@ -172,7 +176,7 @@ func ValidateKeysHandler(c *gin.Context) {
 			}
 
 			keyCtx, cancel := context.WithTimeout(ctx, timeout)
-			testErr := validateSingleKey(keyCtx, ch, k, req.Model)
+			testErr := validateSingleKey(keyCtx, ch, k, req.Model, req.Mode)
 			cancel()
 
 			k.LastUseTimeStamp = time.Now().Unix()
@@ -405,7 +409,7 @@ func runValidateJob(ctx context.Context, job *validateJob, ch *model.Channel) er
 			}
 
 			keyCtx, cancel := context.WithTimeout(ctx, job.Timeout)
-			testErr := validateSingleKey(keyCtx, ch, k, job.Model)
+			testErr := validateSingleKey(keyCtx, ch, k, job.Model, "chat")
 			cancel()
 
 			k.LastUseTimeStamp = time.Now().Unix()
@@ -465,7 +469,7 @@ func runValidateJob(ctx context.Context, job *validateJob, ch *model.Channel) er
 }
 
 // validateSingleKey 使用指定模型对单个 Key 做一次模型列表请求，验证其可用性。
-func validateSingleKey(ctx context.Context, ch *model.Channel, key model.ChannelKey, modelName string) error {
+func validateSingleKey(ctx context.Context, ch *model.Channel, key model.ChannelKey, modelName string, mode string) error {
 	chCopy := *ch
 	chCopy.Enabled = true
 	key.Enabled = true
@@ -477,6 +481,17 @@ func validateSingleKey(ctx context.Context, ch *model.Channel, key model.Channel
 	chCopy.MatchRegex = nil
 	// 关闭密钥池模式，强制使用传入的单个 Key 进行测试
 	chCopy.KeyPoolEnabled = false
+	if mode == "chat" {
+		// 做一次极小的 chat 请求验证额度
+		payload := transformerModel.InternalLLMRequest{
+			Model: modelName,
+			Messages: []transformerModel.Message{
+				{Role: "user", Content: transformerModel.MessageContent{Content: ptr("ping")}},
+			},
+			Stream: ptr(false),
+		}
+		return helper.TestChatRequest(ctx, chCopy, payload)
+	}
 	_, err := helper.FetchModels(ctx, chCopy)
 	return err
 }

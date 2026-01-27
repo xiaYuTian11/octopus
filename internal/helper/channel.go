@@ -3,12 +3,16 @@ package helper
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"strings"
 
 	"github.com/bestruirui/octopus/internal/client"
 	"github.com/bestruirui/octopus/internal/model"
 	"github.com/bestruirui/octopus/internal/op"
+	transformerModel "github.com/bestruirui/octopus/internal/transformer/model"
+	"github.com/bestruirui/octopus/internal/transformer/outbound"
 	"github.com/bestruirui/octopus/internal/utils/log"
 	"github.com/bestruirui/octopus/internal/utils/xstrings"
 	"github.com/dlclark/regexp2"
@@ -133,4 +137,37 @@ func ChannelAutoGroup(channel *model.Channel, ctx context.Context) {
 			}
 		}
 	}
+}
+
+// TestChatRequest 发送一次最小化的 chat/completions 请求以验证 key 是否可用。
+func TestChatRequest(ctx context.Context, ch model.Channel, payload transformerModel.InternalLLMRequest) error {
+	outAdapter := outbound.Get(ch.Type)
+	if outAdapter == nil {
+		return fmt.Errorf("unsupported channel type: %d", ch.Type)
+	}
+	if ch.Keys == nil || len(ch.Keys) == 0 || ch.Keys[0].ChannelKey == "" {
+		return fmt.Errorf("no key provided")
+	}
+	httpClient, err := ChannelHttpClient(&ch)
+	if err != nil {
+		return err
+	}
+	outReq, err := outAdapter.TransformRequest(ctx, &payload, ch.GetBaseUrl(), ch.Keys[0].ChannelKey)
+	if err != nil {
+		return err
+	}
+	copy := outReq.Clone(ctx)
+	// 设置最小参数，避免费用浪费
+	copy.Header.Set("Content-Type", "application/json")
+
+	resp, err := httpClient.Do(copy)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return fmt.Errorf("chat test error %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+	return nil
 }
