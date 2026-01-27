@@ -6,25 +6,31 @@ import (
 	"time"
 )
 
-func InitCache() error {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+const cacheRefreshTimeout = 30 * time.Second
+
+func runCacheStep(fn func(context.Context) error) error {
+	ctx, cancel := context.WithTimeout(context.Background(), cacheRefreshTimeout)
 	defer cancel()
-	if err := settingRefreshCache(ctx); err != nil {
+	return fn(ctx)
+}
+
+func InitCache() error {
+	if err := runCacheStep(settingRefreshCache); err != nil {
 		return fmt.Errorf("setting refresh cache error: %v", err)
 	}
-	if err := channelRefreshCache(ctx); err != nil {
+	if err := runCacheStep(channelRefreshCache); err != nil {
 		return fmt.Errorf("channel refresh cache error: %v", err)
 	}
-	if err := groupRefreshCache(ctx); err != nil {
+	if err := runCacheStep(groupRefreshCache); err != nil {
 		return fmt.Errorf("group refresh cache error: %v", err)
 	}
-	if err := apiKeyRefreshCache(ctx); err != nil {
+	if err := runCacheStep(apiKeyRefreshCache); err != nil {
 		return fmt.Errorf("api key refresh cache error: %v", err)
 	}
-	if err := llmRefreshCache(ctx); err != nil {
+	if err := runCacheStep(llmRefreshCache); err != nil {
 		return fmt.Errorf("llm refresh cache error: %v", err)
 	}
-	if err := statsRefreshCache(ctx); err != nil {
+	if err := runCacheStep(statsRefreshCache); err != nil {
 		return fmt.Errorf("stats refresh cache error: %v", err)
 	}
 	return nil
