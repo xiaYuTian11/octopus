@@ -13,7 +13,9 @@ import {
     useRestoreInvalidChannelKeys,
     useClearInvalidChannelKeys,
     useChannelKeys,
-    useValidateChannelKeys,
+    startValidateChannelKeys,
+    getValidateJobStatus,
+    cancelValidateJob,
 } from '@/api/endpoints/channel';
 import { Loader2, RefreshCcw, Upload } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -48,12 +50,21 @@ export function KeyPool() {
     }>({ active: false, currentBatch: 0, totalBatches: 0, added: 0, skipped: 0, dedupSkipped: 0 });
     const [validateStart, setValidateStart] = useState<number | null>(null);
     const [validateElapsed, setValidateElapsed] = useState<number>(0);
+    const [validateJobId, setValidateJobId] = useState<string | null>(null);
+    const [validateProgress, setValidateProgress] = useState<{
+        state: 'idle' | 'running' | 'success' | 'error' | 'canceled';
+        tested: number;
+        success: number;
+        disabled: number;
+        total: number;
+        error?: string;
+    }>({ state: 'idle', tested: 0, success: 0, disabled: 0, total: 0 });
+    const validatePollRef = useRef<NodeJS.Timeout | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
 
     const importKeys = useImportChannelKeys();
     const restoreKeys = useRestoreInvalidChannelKeys();
     const clearKeys = useClearInvalidChannelKeys();
-    const validateKeys = useValidateChannelKeys();
 
     useEffect(() => {
         if (selectedChannelId === null && poolChannels.length > 0) {
@@ -76,6 +87,14 @@ export function KeyPool() {
         }, 1000);
         return () => clearInterval(timer);
     }, [validateStart]);
+
+    useEffect(() => {
+        return () => {
+            if (validatePollRef.current) {
+                clearInterval(validatePollRef.current);
+            }
+        };
+    }, []);
 
     const selectedChannel = useMemo(
         () => poolChannels.find((c) => c.raw.id === selectedChannelId),
@@ -210,6 +229,13 @@ export function KeyPool() {
         );
     };
 
+    const stopValidatePolling = () => {
+        if (validatePollRef.current) {
+            clearInterval(validatePollRef.current);
+            validatePollRef.current = null;
+        }
+    };
+
     const handleValidate = () => {
         if (!selectedChannelId) {
             toast.error('请先选择渠道');
@@ -222,26 +248,72 @@ export function KeyPool() {
         }
         setValidateSummary('');
         setValidateStart(Date.now());
-        validateKeys.mutate(
-            { channel_id: selectedChannelId, model, timeout: 15 },
-            {
-                onSuccess: (res) => {
-                    const msg = `测试完成：总计 ${res.tested}，成功 ${res.success}，禁用 ${res.disabled}`;
-                    toast.success(msg);
-                    setValidateSummary(msg);
-                    setLastMessage(msg);
-                    keyPage.refetch();
-                },
-                onError: (error) => {
-                    const message = error instanceof Error ? error.message : '验证失败';
-                    toast.error(message);
-                },
-                onSettled: () => {
-                    setValidateStart(null);
-                    setValidateElapsed(0);
-                },
-            }
-        );
+        setValidateProgress({ state: 'running', tested: 0, success: 0, disabled: 0, total: 0 });
+
+        startValidateChannelKeys({ channel_id: selectedChannelId, model, timeout: 15, concurrency: 3 })
+            .then((res) => {
+                const { job_id, total } = res;
+                setValidateJobId(job_id);
+                setValidateProgress((prev) => ({ ...prev, total, state: 'running' }));
+
+                validatePollRef.current = setInterval(async () => {
+                    try {
+                        const status = await getValidateJobStatus(job_id);
+                        setValidateProgress({
+                            state: status.state,
+                            tested: status.tested,
+                            success: status.success,
+                            disabled: status.disabled,
+                            total: status.total,
+                            error: status.error,
+                        });
+                        if (status.state === 'success' || status.state === 'error' || status.state === 'canceled') {
+                            stopValidatePolling();
+                            setValidateJobId(null);
+                            const msg =
+                                status.state === 'success'
+                                    ? `测试完成：总计 ${status.tested}/${status.total}，成功 ${status.success}，禁用 ${status.disabled}`
+                                    : status.state === 'canceled'
+                                    ? '已取消测试'
+                                    : `测试失败：${status.error || '未知错误'}`;
+                            setValidateSummary(msg);
+                            toast[status.state === 'success' ? 'success' : 'error'](msg);
+                            setLastMessage(msg);
+                            keyPage.refetch();
+                            setValidateStart(null);
+                            setValidateElapsed(0);
+                        }
+                    } catch (err) {
+                        stopValidatePolling();
+                        setValidateJobId(null);
+                        setValidateProgress((prev) => ({ ...prev, state: 'error', error: (err as Error)?.message }));
+                        toast.error((err as Error)?.message || '验证失败');
+                        setValidateStart(null);
+                        setValidateElapsed(0);
+                    }
+                }, 2000);
+            })
+            .catch((error) => {
+                setValidateStart(null);
+                setValidateElapsed(0);
+                const message = error instanceof Error ? error.message : '验证失败';
+                toast.error(message);
+            });
+    };
+
+    const handleCancelValidate = () => {
+        if (!validateJobId) return;
+        stopValidatePolling();
+        cancelValidateJob(validateJobId)
+            .then(() => {
+                setValidateProgress((prev) => ({ ...prev, state: 'canceled' }));
+                setValidateJobId(null);
+                setValidateStart(null);
+                setValidateElapsed(0);
+            })
+            .catch((err) => {
+                toast.error((err as Error)?.message || '取消失败');
+            });
     };
 
     if (!poolChannels || poolChannels.length === 0) {
@@ -370,16 +442,16 @@ export function KeyPool() {
                                     value={validateModel}
                                     onChange={(e) => setValidateModel(e.target.value)}
                                     placeholder="如 gpt-4.1-nano"
-                                    disabled={validateKeys.isPending}
+                                    disabled={!!validateJobId}
                                 />
                             </div>
                             <Button
                                 type="button"
                                 onClick={handleValidate}
-                                disabled={validateKeys.isPending || importStatus.active || isFileImporting}
+                                disabled={!!validateJobId || importStatus.active || isFileImporting}
                                 className="rounded-xl"
                             >
-                                {validateKeys.isPending ? (
+                                {validateJobId ? (
                                     <span className="flex items-center gap-2">
                                         <Loader2 className="h-4 w-4 animate-spin" />
                                         测试中...
@@ -388,26 +460,39 @@ export function KeyPool() {
                                     '一键测试'
                                 )}
                             </Button>
-                            {validateSummary && !validateKeys.isPending && (
+                            {validateJobId && (
+                                <Button variant="outline" type="button" onClick={handleCancelValidate} className="rounded-xl">
+                                    取消
+                                </Button>
+                            )}
+                            {validateSummary && !validateJobId && (
                                 <div className="text-xs text-muted-foreground">{validateSummary}</div>
                             )}
                         </div>
-                        {(validateKeys.isPending ||
+                        {validateProgress.state !== 'idle' && (
+                            <div className="text-sm text-muted-foreground">
+                                进度：{validateProgress.tested}/{validateProgress.total || '?'}，成功 {validateProgress.success}，禁用 {validateProgress.disabled}
+                                {validateProgress.state === 'error' && validateProgress.error ? `，错误：${validateProgress.error}` : ''}
+                            </div>
+                        )}
+                        {(validateJobId ||
                             importKeys.isPending ||
                             restoreKeys.isPending ||
                             clearKeys.isPending ||
                             importStatus.active) && (
                             <div className="text-sm text-muted-foreground flex items-center gap-2">
                                 <Loader2 className="h-4 w-4 animate-spin" />
-                                {validateKeys.isPending
-                                    ? `测试中${validateElapsed > 0 ? `，已用时 ${validateElapsed}s` : ''}，请勿关闭页面`
+                                {validateJobId
+                                    ? `测试中${validateElapsed > 0 ? `，已用时 ${validateElapsed}s` : ''}${
+                                          validateProgress.total > 0 ? `，进度 ${validateProgress.tested}/${validateProgress.total}` : ''
+                                      }，请勿关闭页面`
                                     : importStatus.active && importStatus.totalBatches > 0
                                     ? `导入中 ${importStatus.currentBatch}/${importStatus.totalBatches}，新增 ${importStatus.added}，跳过 ${importStatus.skipped}，去重 ${importStatus.dedupSkipped}`
                                     : tActions('saving')}
                             </div>
                         )}
                         {lastMessage &&
-                            !validateKeys.isPending &&
+                            !validateJobId &&
                             !importKeys.isPending &&
                             !restoreKeys.isPending &&
                             !clearKeys.isPending &&

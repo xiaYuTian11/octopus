@@ -414,6 +414,7 @@ export type ValidateChannelKeysRequest = {
     channel_id: number;
     model: string;
     timeout?: number;
+    concurrency?: number;
 };
 
 export type ValidateChannelKeysResponse = {
@@ -421,6 +422,39 @@ export type ValidateChannelKeysResponse = {
     disabled: number;
     success: number;
 };
+
+// ---------- 新增：异步校验任务 ----------
+export type ValidateJobStartResponse = {
+    job_id: string;
+    total: number;
+};
+
+export type ValidateJobStatusResponse = {
+    id: string;
+    channel_id: number;
+    model: string;
+    state: 'pending' | 'running' | 'success' | 'error' | 'canceled';
+    error?: string;
+    total: number;
+    tested: number;
+    disabled: number;
+    success: number;
+    started_at?: number;
+    updated_at?: number;
+    timeout_sec?: number;
+};
+
+export async function startValidateChannelKeys(data: ValidateChannelKeysRequest) {
+    return apiClient.post<ValidateJobStartResponse>('/api/v1/channel/keys/validate/start', data);
+}
+
+export async function getValidateJobStatus(id: string) {
+    return apiClient.get<ValidateJobStatusResponse>(`/api/v1/channel/keys/validate/status?id=${encodeURIComponent(id)}`);
+}
+
+export async function cancelValidateJob(id: string) {
+    return apiClient.post<{ canceled: boolean }>('/api/v1/channel/keys/validate/cancel', { id });
+}
 
 /**
  * 导入渠道密钥 Hook

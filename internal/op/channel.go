@@ -950,6 +950,23 @@ func setKeyCountsFromAgg(ch *model.Channel, total int64, enabled int64) {
 	ch.KeyDisabledCount = int(total - enabled)
 }
 
+// ChannelKeysCount 返回渠道下的 key 总数，可选过滤 enabled 状态。
+func ChannelKeysCount(ctx context.Context, channelID int, enabled *bool) (int64, error) {
+	if channelID <= 0 {
+		return 0, fmt.Errorf("invalid channel_id")
+	}
+	dbConn := db.GetDB().WithContext(ctx)
+	query := dbConn.Model(&model.ChannelKey{}).Where("channel_id = ?", channelID)
+	if enabled != nil {
+		query = query.Where("enabled = ?", *enabled)
+	}
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return 0, err
+	}
+	return total, nil
+}
+
 // ChannelKeysPage 返回分页后的密钥列表及总数，用于密钥池查看。
 func ChannelKeysPage(ctx context.Context, channelID int, page, pageSize int, enabled *bool) ([]model.ChannelKey, int64, error) {
 	if channelID <= 0 {

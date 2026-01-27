@@ -54,6 +54,18 @@ func init() {
 				Handle(ValidateKeysHandler),
 		).
 		AddRoute(
+			router.NewRoute("/keys/validate/start", http.MethodPost).
+				Handle(ValidateKeysStartHandler),
+		).
+		AddRoute(
+			router.NewRoute("/keys/validate/status", http.MethodGet).
+				Handle(ValidateKeysStatusHandler),
+		).
+		AddRoute(
+			router.NewRoute("/keys/validate/cancel", http.MethodPost).
+				Handle(ValidateKeysCancelHandler),
+		).
+		AddRoute(
 			router.NewRoute("/keys/list", http.MethodPost).
 				Handle(listChannelKeys),
 		).
