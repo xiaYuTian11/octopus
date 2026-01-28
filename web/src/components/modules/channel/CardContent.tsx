@@ -146,19 +146,25 @@ export function CardContent({ channel, stats }: { channel: Channel; stats: Stats
 
             const keys_to_add = nextKeys
                 .filter((k) => !k.id && k.channel_key.trim())
-                .map((k) => ({ enabled: k.enabled, channel_key: k.channel_key, remark: k.remark ?? '' }));
+                .map((k) => ({
+                    enabled: k.enabled,
+                    channel_key: k.channel_key,
+                    remark: k.remark ?? '',
+                    rate_limit_rpm: k.rate_limit_rpm ?? 0,
+                }));
 
             const keys_to_update = nextKeys
                 .filter((k) => typeof k.id === 'number' && originalByID.has(k.id as number))
                 .map((k) => {
                     const orig = originalByID.get(k.id as number)!;
-                    const u: { id: number; enabled?: boolean; channel_key?: string; remark?: string } = { id: k.id as number };
+                    const u: { id: number; enabled?: boolean; channel_key?: string; remark?: string; rate_limit_rpm?: number } = { id: k.id as number };
                     if (k.enabled !== orig.enabled) u.enabled = k.enabled;
                     if (k.channel_key !== orig.channel_key) u.channel_key = k.channel_key;
                     if ((k.remark ?? '') !== orig.remark) u.remark = k.remark ?? '';
+                    if ((k.rate_limit_rpm ?? 0) !== (orig.rate_limit_rpm ?? 0)) u.rate_limit_rpm = k.rate_limit_rpm ?? 0;
                     return Object.keys(u).length > 1 ? u : null;
                 })
-                .filter((u) => u !== null) as Array<{ id: number; enabled?: boolean; channel_key?: string; remark?: string }>;
+                .filter((u) => u !== null) as Array<{ id: number; enabled?: boolean; channel_key?: string; remark?: string; rate_limit_rpm?: number }>;
 
             if (keys_to_add.length > 0) req.keys_to_add = keys_to_add;
             if (keys_to_update.length > 0) req.keys_to_update = keys_to_update;
