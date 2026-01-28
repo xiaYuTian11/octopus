@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/bestruirui/octopus/internal/helper"
 	"github.com/bestruirui/octopus/internal/model"
 	"github.com/bestruirui/octopus/internal/op"
 	"github.com/bestruirui/octopus/internal/server/middleware"
@@ -32,6 +33,11 @@ func init() {
 		AddRoute(
 			router.NewRoute("/delete/:id", http.MethodDelete).
 				Handle(deleteChannelModelWatch),
+		).
+		AddRoute(
+			router.NewRoute("/test", http.MethodPost).
+				Use(middleware.RequireJSON()).
+				Handle(testChannelModelWatch),
 		)
 }
 
@@ -92,4 +98,19 @@ func deleteChannelModelWatch(c *gin.Context) {
 		return
 	}
 	resp.Success(c, nil)
+}
+
+func testChannelModelWatch(c *gin.Context) {
+	var req struct {
+		ID int `json:"id"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil || req.ID <= 0 {
+		resp.Error(c, http.StatusBadRequest, resp.ErrInvalidJSON)
+		return
+	}
+	if err := helper.TestChannelModelWatch(c.Request.Context(), req.ID); err != nil {
+		resp.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	resp.Success(c, gin.H{"ok": true})
 }

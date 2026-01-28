@@ -311,6 +311,12 @@
             "lastNotified": "上次通知：{time}",
             "never": "从未",
             "deleted": "规则已删除",
+            "test": {
+                "action": "测试发送",
+                "testing": "测试中...",
+                "success": "测试已发送",
+                "failed": "测试发送失败"
+            },
             "form": {
                 "channel": "渠道",
                 "channelPlaceholder": "选择渠道",

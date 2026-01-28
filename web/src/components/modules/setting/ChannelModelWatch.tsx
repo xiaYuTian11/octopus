@@ -9,6 +9,7 @@ import {
     useCreateChannelModelWatch,
     useDeleteChannelModelWatch,
     useUpdateChannelModelWatch,
+    useTestChannelModelWatch,
 } from '@/api/endpoints/channel';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
@@ -41,6 +42,7 @@ export function SettingChannelModelWatch() {
     const createWatch = useCreateChannelModelWatch();
     const updateWatch = useUpdateChannelModelWatch();
     const deleteWatch = useDeleteChannelModelWatch();
+    const testWatch = useTestChannelModelWatch();
 
     const [form, setForm] = useState<WatchForm>(defaultForm);
 
@@ -214,17 +216,34 @@ export function SettingChannelModelWatch() {
                                 </div>
                             </div>
                             <div className="flex items-center gap-3">
-                                <Switch
-                                    checked={item.enabled}
-                                    onCheckedChange={(checked) =>
-                                        updateWatch.mutate({ id: item.id, enabled: checked })
-                                    }
-                                />
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="text-destructive hover:text-destructive"
-                                    onClick={() =>
+                                    <Switch
+                                        checked={item.enabled}
+                                        onCheckedChange={(checked) =>
+                                            updateWatch.mutate({ id: item.id, enabled: checked })
+                                        }
+                                    />
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() =>
+                                            testWatch.mutate(
+                                                { id: item.id },
+                                                {
+                                                    onSuccess: () => toast.success(t('channelModelWatch.test.success')),
+                                                    onError: (err) => toast.error(t('channelModelWatch.test.failed'), { description: err.message }),
+                                                }
+                                            )
+                                        }
+                                        disabled={testWatch.isPending}
+                                        className="rounded-xl"
+                                    >
+                                        {testWatch.isPending ? t('channelModelWatch.test.testing') : t('channelModelWatch.test.action')}
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="text-destructive hover:text-destructive"
+                                        onClick={() =>
                                         deleteWatch.mutate(item.id, {
                                             onSuccess: () => toast.success(t('channelModelWatch.deleted')),
                                         })

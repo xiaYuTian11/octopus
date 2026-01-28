@@ -17,6 +17,17 @@ type ChannelModelWatchHit struct {
 	MatchedModel string
 }
 
+func ChannelModelWatchGet(ctx context.Context, id int) (*model.ChannelModelWatch, error) {
+	if id <= 0 {
+		return nil, fmt.Errorf("invalid id")
+	}
+	var watch model.ChannelModelWatch
+	if err := db.GetDB().WithContext(ctx).First(&watch, id).Error; err != nil {
+		return nil, err
+	}
+	return &watch, nil
+}
+
 func ChannelModelWatchList(ctx context.Context, channelID *int) ([]model.ChannelModelWatch, error) {
 	conn := db.GetDB().WithContext(ctx).Model(&model.ChannelModelWatch{})
 	if channelID != nil && *channelID > 0 {

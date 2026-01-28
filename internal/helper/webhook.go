@@ -52,7 +52,9 @@ func NotifyChannelModelWatch(ctx context.Context, channel model.Channel, candida
 	}
 
 	for _, hit := range hits {
-		fireChannelModelWebhook(ctx, channel, hit, payloadAll, trigger)
+		if err := sendChannelModelWebhook(ctx, channel, hit, payloadAll, trigger); err != nil {
+			log.Warnf("webhook notify failed (channel=%d, watch=%d): %v", channel.ID, hit.Watch.ID, err)
+		}
 	}
 
 	ids := make([]int, 0, len(hits))
@@ -64,7 +66,24 @@ func NotifyChannelModelWatch(ctx context.Context, channel model.Channel, candida
 	}
 }
 
-func fireChannelModelWebhook(ctx context.Context, channel model.Channel, hit op.ChannelModelWatchHit, allModels []string, trigger string) {
+// TestChannelModelWatch 触发一次测试 webhook，不会更新去重时间戳。
+func TestChannelModelWatch(ctx context.Context, watchID int) error {
+	watch, err := op.ChannelModelWatchGet(ctx, watchID)
+	if err != nil {
+		return err
+	}
+	channel, err := op.ChannelGet(watch.ChannelID, ctx)
+	if err != nil {
+		return err
+	}
+	hit := op.ChannelModelWatchHit{
+		Watch:        *watch,
+		MatchedModel: watch.ModelName,
+	}
+	return sendChannelModelWebhook(ctx, *channel, hit, []string{watch.ModelName}, "manual_test")
+}
+
+func sendChannelModelWebhook(ctx context.Context, channel model.Channel, hit op.ChannelModelWatchHit, allModels []string, trigger string) error {
 	payload := channelModelWatchPayload{
 		Event:         "channel_model_detected",
 		Trigger:       trigger,
@@ -76,8 +95,7 @@ func fireChannelModelWebhook(ctx context.Context, channel model.Channel, hit op.
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
-		log.Warnf("marshal webhook payload failed: %v", err)
-		return
+		return fmt.Errorf("marshal webhook payload failed: %w", err)
 	}
 	// 重试 3 次指数退避
 	url := hit.Watch.WebhookURL
@@ -98,13 +116,13 @@ func fireChannelModelWebhook(ctx context.Context, channel model.Channel, hit op.
 		} else {
 			resp.Body.Close()
 			if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-				return
+				return nil
 			}
 			lastErr = fmt.Errorf("status %d", resp.StatusCode)
 		}
 		time.Sleep(time.Duration(1<<attempt) * 200 * time.Millisecond)
 	}
-	log.Warnf("webhook notify failed (channel=%d, watch=%d): %v", channel.ID, hit.Watch.ID, lastErr)
+	return lastErr
 }
 
 func signPayload(body []byte, secret string) string {

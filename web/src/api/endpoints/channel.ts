@@ -373,6 +373,10 @@ export type ChannelModelWatchUpdateRequest = {
     enabled?: boolean;
 };
 
+export type ChannelModelWatchTestRequest = {
+    id: number;
+};
+
 export function useChannelModelWatchList(channelId?: number) {
     return useQuery({
         queryKey: ['channel', 'model-watch', channelId ?? 'all'],
@@ -416,6 +420,14 @@ export function useDeleteChannelModelWatch() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['channel', 'model-watch'] });
+        },
+    });
+}
+
+export function useTestChannelModelWatch() {
+    return useMutation({
+        mutationFn: async (data: ChannelModelWatchTestRequest) => {
+            return apiClient.post<{ ok: boolean }>('/api/v1/channel/watch/test', data);
         },
     });
 }

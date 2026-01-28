@@ -311,6 +311,12 @@
             "lastNotified": "Last notified: {time}",
             "never": "Never",
             "deleted": "Rule deleted",
+            "test": {
+                "action": "Send test",
+                "testing": "Testing...",
+                "success": "Test sent",
+                "failed": "Test failed"
+            },
             "form": {
                 "channel": "Channel",
                 "channelPlaceholder": "Select channel",
