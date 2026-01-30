@@ -284,9 +284,6 @@ func parseRequest(inboundType inbound.InboundType, c *gin.Context) (*model.Inter
 		return nil, nil, err
 	}
 
-	// DEBUG: 记录客户端发送的所有 header，用于排查问题
-	log.Warnf("[DEBUG-HEADERS] Client headers: %v", c.Request.Header)
-
 	inAdapter := inbound.Get(inboundType)
 	internalRequest, err := inAdapter.TransformRequest(c.Request.Context(), body)
 	if err != nil {
@@ -310,27 +307,11 @@ func (rc *relayContext) forward() (int, error) {
 	ctx := rc.c.Request.Context()
 
 	// 构建出站请求
-	// 如果客户端发送了 Authorization header，使用客户端的 key；否则使用渠道配置的 key
-	clientAuth := rc.c.Request.Header.Get("Authorization")
-	usedKeyForRequest := rc.usedKey.ChannelKey
-	if clientAuth != "" {
-		// 客户端发送了 Authorization header，使用客户端的 key（透传模式）
-		// 提取 Bearer 后面的 key
-		if strings.HasPrefix(clientAuth, "Bearer ") {
-			clientKey := strings.TrimPrefix(clientAuth, "Bearer ")
-			if strings.HasPrefix(clientKey, "sk-octopus-") {
-				// 这是 octopus 系统的 key，需要透传给上游
-				// 但先检查是否应该使用客户端的 key
-				log.Warnf("[DEBUG-KEY] Using client key for passthrough mode")
-			}
-		}
-	}
-
 	outboundRequest, err := rc.outAdapter.TransformRequest(
 		ctx,
 		rc.internalRequest,
 		rc.channel.GetBaseUrl(),
-		usedKeyForRequest,
+		rc.usedKey.ChannelKey,
 	)
 	if err != nil {
 		log.Warnf("failed to create request: %v", err)
@@ -375,31 +356,24 @@ func (rc *relayContext) forward() (int, error) {
 	return response.StatusCode, nil
 }
 
-// copyHeaders 复制请求头，完全透传客户端的 header
-// 不过滤任何 header，让程序像一个真正的透明代理
-// 这样上游服务收到的请求与 Cherry Studio 直连时完全一致
+// copyHeaders 复制请求头，过滤 hop-by-hop 头，并确保使用渠道密钥
 func (rc *relayContext) copyHeaders(outboundRequest *http.Request) {
-	// 记录原始的 Authorization header（如果有）
-	originalAuth := outboundRequest.Header.Get("Authorization")
-
-	// 完全复制客户端的所有 header
+	// 先复制客户端头，跳过 hop-by-hop 以及 Authorization
 	for key, values := range rc.c.Request.Header {
+		lk := strings.ToLower(key)
+		if hopByHopHeaders[lk] || lk == "authorization" {
+			continue
+		}
 		outboundRequest.Header[key] = values
 	}
-
-	// 记录 header 复制的详细信息
-	finalAuth := outboundRequest.Header.Get("Authorization")
-	hasXApiKey := outboundRequest.Header.Get("x-api-key") != ""
-
-	log.Infof("[HEADER-COPY] Channel: %s, Original Auth: %s, Final Auth: %s, Has x-api-key: %v",
-		rc.channel.Name,
-		maskAuthHeader(originalAuth),
-		maskAuthHeader(finalAuth),
-		hasXApiKey)
-
-	// DEBUG: 记录转发的完整 header 和代理信息
-	log.Warnf("[DEBUG-OUTGOING] Channel %s proxy=%v full_headers: %v",
-		rc.channel.Name, rc.channel.Proxy, maskSensitiveHeaders(outboundRequest.Header))
+	// 渠道自定义头
+	if len(rc.channel.CustomHeader) > 0 {
+		for _, header := range rc.channel.CustomHeader {
+			outboundRequest.Header.Set(header.HeaderKey, header.HeaderValue)
+		}
+	}
+	// 强制使用渠道密钥，避免被客户端 Authorization 覆盖
+	outboundRequest.Header.Set("Authorization", "Bearer "+rc.usedKey.ChannelKey)
 }
 
 // maskAuthHeader 脱敏认证 header
