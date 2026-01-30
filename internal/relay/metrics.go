@@ -26,6 +26,10 @@ type RelayMetrics struct {
 	StartTime      time.Time
 	FirstTokenTime time.Time // 首个 Token 时间（流式场景）
 
+	// 请求信息
+	RequestURL    string // 完整的上游请求URL
+	RequestMethod string // 请求方法
+
 	// 请求和响应内容
 	InternalRequest  *transformerModel.InternalLLMRequest
 	InternalResponse *transformerModel.InternalLLMResponse
@@ -61,6 +65,12 @@ func (m *RelayMetrics) SetFirstTokenTime(t time.Time) {
 // SetInternalRequest 设置内部请求
 func (m *RelayMetrics) SetInternalRequest(req *transformerModel.InternalLLMRequest) {
 	m.InternalRequest = req
+}
+
+// SetRequestInfo 设置请求URL和方法
+func (m *RelayMetrics) SetRequestInfo(url, method string) {
+	m.RequestURL = url
+	m.RequestMethod = method
 }
 
 // SetInternalResponse 设置内部响应并计算费用
@@ -242,6 +252,8 @@ func (m *RelayMetrics) saveLog(ctx context.Context, err error, duration time.Dur
 		ChannelId:        m.ChannelID,
 		ActualModelName:  m.ActualModel,
 		UseTime:          int(duration.Milliseconds()),
+		RequestURL:       m.RequestURL,
+		RequestMethod:    m.RequestMethod,
 	}
 
 	// 设置首字时间（流式场景）

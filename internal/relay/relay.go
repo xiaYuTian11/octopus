@@ -114,9 +114,6 @@ func Handler(inboundType inbound.InboundType, c *gin.Context) {
 			continue
 		}
 
-		log.Infof("request model %s, mode: %d, forwarding to channel: %s model: %s (attempt %d/%d, tried %d/%d channels)",
-			internalRequest.Model, group.Mode, channel.Name, item.ModelName, attempt+1, maxAttempts, len(attemptedChannels), itemCount)
-
 		internalRequest.Model = item.ModelName
 		metrics.SetChannel(channel.ID, channel.Name, item.ModelName)
 
@@ -136,6 +133,16 @@ func Handler(inboundType inbound.InboundType, c *gin.Context) {
 			lastErr = fmt.Errorf("no available key")
 			continue
 		}
+
+		keyTail := ""
+		if len(usedKey.ChannelKey) > 4 {
+			keyTail = usedKey.ChannelKey[len(usedKey.ChannelKey)-4:]
+		} else {
+			keyTail = usedKey.ChannelKey
+		}
+
+		log.Infof("request model %s, mode: %d, forwarding to channel: %s model: %s (attempt %d/%d, tried %d/%d channels), key_id=%d, key_tail=%s",
+			internalRequest.Model, group.Mode, channel.Name, item.ModelName, attempt+1, maxAttempts, len(attemptedChannels), itemCount, usedKey.ID, keyTail)
 
 		outAdapter := outbound.Get(channel.Type)
 		if outAdapter == nil {
@@ -166,6 +173,7 @@ func Handler(inboundType inbound.InboundType, c *gin.Context) {
 			channel:              channel,
 			metrics:              metrics,
 			usedKey:              usedKey,
+			keyTail:              keyTail,
 			firstTokenTimeOutSec: group.FirstTokenTimeOut,
 			validator:            NewResponseValidator(),
 		}
@@ -209,9 +217,17 @@ func Handler(inboundType inbound.InboundType, c *gin.Context) {
 				metrics.Save(c.Request.Context(), false, err)
 				return
 			}
-			log.Warnf("channel %s failed: %v (attempt %d/%d, tried %d/%d channels)",
-				channel.Name, err, attempt+1, maxAttempts, len(attemptedChannels), itemCount)
-			lastErr = fmt.Errorf("channel %s failed: %v", channel.Name, err)
+			requestURL := rc.metrics.RequestURL
+			requestMethod := rc.metrics.RequestMethod
+			if requestURL != "" {
+				log.Warnf("channel %s failed on %s %s: %v (attempt %d/%d, tried %d/%d channels)",
+					channel.Name, requestMethod, requestURL, err, attempt+1, maxAttempts, len(attemptedChannels), itemCount)
+				lastErr = fmt.Errorf("channel %s failed on %s %s: %v", channel.Name, requestMethod, requestURL, err)
+			} else {
+				log.Warnf("channel %s failed: %v (attempt %d/%d, tried %d/%d channels)",
+					channel.Name, err, attempt+1, maxAttempts, len(attemptedChannels), itemCount)
+				lastErr = fmt.Errorf("channel %s failed: %v", channel.Name, err)
+			}
 		}
 	}
 
@@ -268,6 +284,9 @@ func parseRequest(inboundType inbound.InboundType, c *gin.Context) (*model.Inter
 		return nil, nil, err
 	}
 
+	// DEBUG: 记录客户端发送的所有 header，用于排查问题
+	log.Warnf("[DEBUG-HEADERS] Client headers: %v", c.Request.Header)
+
 	inAdapter := inbound.Get(inboundType)
 	internalRequest, err := inAdapter.TransformRequest(c.Request.Context(), body)
 	if err != nil {
@@ -291,24 +310,45 @@ func (rc *relayContext) forward() (int, error) {
 	ctx := rc.c.Request.Context()
 
 	// 构建出站请求
+	// 如果客户端发送了 Authorization header，使用客户端的 key；否则使用渠道配置的 key
+	clientAuth := rc.c.Request.Header.Get("Authorization")
+	usedKeyForRequest := rc.usedKey.ChannelKey
+	if clientAuth != "" {
+		// 客户端发送了 Authorization header，使用客户端的 key（透传模式）
+		// 提取 Bearer 后面的 key
+		if strings.HasPrefix(clientAuth, "Bearer ") {
+			clientKey := strings.TrimPrefix(clientAuth, "Bearer ")
+			if strings.HasPrefix(clientKey, "sk-octopus-") {
+				// 这是 octopus 系统的 key，需要透传给上游
+				// 但先检查是否应该使用客户端的 key
+				log.Warnf("[DEBUG-KEY] Using client key for passthrough mode")
+			}
+		}
+	}
+
 	outboundRequest, err := rc.outAdapter.TransformRequest(
 		ctx,
 		rc.internalRequest,
 		rc.channel.GetBaseUrl(),
-		rc.usedKey.ChannelKey,
+		usedKeyForRequest,
 	)
 	if err != nil {
 		log.Warnf("failed to create request: %v", err)
 		return 0, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	// 复制请求头
+	// 记录完整的请求URL和方法到metrics（必须在发送请求前记录，以便在失败时也能保存）
+	if outboundRequest.URL != nil {
+		rc.metrics.SetRequestInfo(outboundRequest.URL.String(), outboundRequest.Method)
+	}
+
+	// 复制请求头（包括 Authorization）
 	rc.copyHeaders(outboundRequest)
 
 	// 发送请求
 	response, err := rc.sendRequest(outboundRequest)
 	if err != nil {
-		return 0, fmt.Errorf("failed to send request: %w", err)
+		return 0, fmt.Errorf("failed to send request %s %s: %w", outboundRequest.Method, outboundRequest.URL.String(), err)
 	}
 	defer response.Body.Close()
 
@@ -316,9 +356,10 @@ func (rc *relayContext) forward() (int, error) {
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		body, err := io.ReadAll(response.Body)
 		if err != nil {
-			return 0, fmt.Errorf("failed to read response body: %w", err)
+			return 0, fmt.Errorf("failed to read response body for %s %s: %w", outboundRequest.Method, outboundRequest.URL.String(), err)
 		}
-		return 0, fmt.Errorf("upstream error: %d: %s", response.StatusCode, string(body))
+		rc.logUpstreamError(outboundRequest, response, body)
+		return 0, fmt.Errorf("upstream error %s %s: %d: %s", outboundRequest.Method, outboundRequest.URL.String(), response.StatusCode, string(body))
 	}
 
 	// 处理响应
@@ -334,21 +375,63 @@ func (rc *relayContext) forward() (int, error) {
 	return response.StatusCode, nil
 }
 
-// copyHeaders 复制请求头，过滤 hop-by-hop 头
+// copyHeaders 复制请求头，完全透传客户端的 header
+// 不过滤任何 header，让程序像一个真正的透明代理
+// 这样上游服务收到的请求与 Cherry Studio 直连时完全一致
 func (rc *relayContext) copyHeaders(outboundRequest *http.Request) {
+	// 记录原始的 Authorization header（如果有）
+	originalAuth := outboundRequest.Header.Get("Authorization")
+
+	// 完全复制客户端的所有 header
 	for key, values := range rc.c.Request.Header {
-		if hopByHopHeaders[strings.ToLower(key)] {
-			continue
-		}
-		for _, value := range values {
-			outboundRequest.Header.Set(key, value)
+		outboundRequest.Header[key] = values
+	}
+
+	// 记录 header 复制的详细信息
+	finalAuth := outboundRequest.Header.Get("Authorization")
+	hasXApiKey := outboundRequest.Header.Get("x-api-key") != ""
+
+	log.Infof("[HEADER-COPY] Channel: %s, Original Auth: %s, Final Auth: %s, Has x-api-key: %v",
+		rc.channel.Name,
+		maskAuthHeader(originalAuth),
+		maskAuthHeader(finalAuth),
+		hasXApiKey)
+
+	// DEBUG: 记录转发的完整 header 和代理信息
+	log.Warnf("[DEBUG-OUTGOING] Channel %s proxy=%v full_headers: %v",
+		rc.channel.Name, rc.channel.Proxy, maskSensitiveHeaders(outboundRequest.Header))
+}
+
+// maskAuthHeader 脱敏认证 header
+func maskAuthHeader(auth string) string {
+	if auth == "" {
+		return "<empty>"
+	}
+	if len(auth) > 20 {
+		return auth[:10] + "..." + auth[len(auth)-4:]
+	}
+	return auth[:min(len(auth), 10)] + "..."
+}
+
+// maskSensitiveHeaders 脱敏敏感 header
+func maskSensitiveHeaders(headers http.Header) map[string]string {
+	result := make(map[string]string)
+	for k, v := range headers {
+		key := strings.ToLower(k)
+		if strings.Contains(key, "auth") || strings.Contains(key, "key") || strings.Contains(key, "token") {
+			result[k] = "<redacted>"
+		} else {
+			result[k] = strings.Join(v, ", ")
 		}
 	}
-	if len(rc.channel.CustomHeader) > 0 {
-		for _, header := range rc.channel.CustomHeader {
-			outboundRequest.Header.Set(header.HeaderKey, header.HeaderValue)
-		}
+	return result
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
 	}
+	return b
 }
 
 // sendRequest 发送 HTTP 请求
@@ -361,11 +444,57 @@ func (rc *relayContext) sendRequest(req *http.Request) (*http.Response, error) {
 
 	response, err := httpClient.Do(req)
 	if err != nil {
-		log.Warnf("failed to send request: %v", err)
+		requestURL := ""
+		if req != nil && req.URL != nil {
+			requestURL = req.URL.String()
+		}
+		log.Warnf("failed to send request %s %s: %v", req.Method, requestURL, err)
 		return nil, err
 	}
 
 	return response, nil
+}
+
+// logUpstreamError 记录更详细的上游错误信息，便于排查例如 CDN/Cloudflare 502 等问题
+func (rc *relayContext) logUpstreamError(req *http.Request, resp *http.Response, body []byte) {
+	const maxBodyLog = 2048 // 避免日志过大
+
+	requestURL := ""
+	method := ""
+	if req != nil && req.URL != nil {
+		requestURL = req.URL.String()
+		method = req.Method
+	}
+
+	// 记录请求头（脱敏）
+	reqHeaders := make(map[string][]string, len(req.Header))
+	for k, v := range req.Header {
+		if strings.EqualFold(k, "Authorization") || strings.Contains(strings.ToLower(k), "api-key") {
+			reqHeaders[k] = []string{"<redacted>"}
+			continue
+		}
+		reqHeaders[k] = v
+	}
+
+	reqContentLength := req.ContentLength
+
+	// 摘取关键响应头，方便定位链路
+	headerSnapshot := map[string]string{
+		"CF-RAY":         resp.Header.Get("CF-RAY"),
+		"Server":         resp.Header.Get("Server"),
+		"Via":            resp.Header.Get("Via"),
+		"Content-Type":   resp.Header.Get("Content-Type"),
+		"Content-Length": resp.Header.Get("Content-Length"),
+		"Location":       resp.Header.Get("Location"),
+	}
+
+	bodyStr := string(body)
+	if len(bodyStr) > maxBodyLog {
+		bodyStr = bodyStr[:maxBodyLog] + "...(truncated)"
+	}
+
+	log.Warnf("upstream non-2xx | channel=%s | method=%s | url=%s | status=%d | key_id=%d | key_tail=%s | resp_headers=%v | req_headers=%v | req_content_length=%d | body=%s",
+		rc.channel.Name, method, requestURL, resp.StatusCode, rc.usedKey.ID, rc.keyTail, headerSnapshot, reqHeaders, reqContentLength, bodyStr)
 }
 
 // handleStreamResponse 处理流式响应

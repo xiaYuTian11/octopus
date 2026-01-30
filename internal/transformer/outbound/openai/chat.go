@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/bestruirui/octopus/internal/transformer/model"
+	"github.com/bestruirui/octopus/internal/utils/log"
 )
 
 type ChatOutbound struct{}
@@ -50,14 +51,45 @@ func (o *ChatOutbound) TransformRequest(ctx context.Context, request *model.Inte
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
+	// 对于流式请求，需要设置 Accept: text/event-stream 以支持 SSE
+	// 同时保留 application/json 以兼容某些返回 JSON 错误的上游
+	if request.Stream != nil && *request.Stream {
+		req.Header.Set("Accept", "text/event-stream, application/json")
+	} else {
+		req.Header.Set("Accept", "application/json")
+	}
+	// 设置浏览器 User-Agent 以绕过 Cloudflare 等防护
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+
+	// 设置认证 header
+	// 注意：copyHeaders 会在后面完全覆盖所有 header，包括这里设置的 Authorization
+	// 所以如果客户端发送了自定义的认证 header（如 x-api-key），它会被保留
+	// 这里设置的 Authorization 只是作为默认值
 	req.Header.Set("Authorization", "Bearer "+key)
 
 	parsedUrl, err := url.Parse(strings.TrimSuffix(baseUrl, "/"))
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse base url: %w", err)
 	}
-	parsedUrl.Path = parsedUrl.Path + "/chat/completions"
+
+	// 根据原始 API 格式决定使用哪个端点
+	// 如果客户端使用 /v1/responses，则转发到上游的 /responses
+	// 否则使用标准的 /chat/completions
+	var endpoint string
+	if request.RawAPIFormat == model.APIFormatOpenAIResponse {
+		endpoint = "/responses"
+		parsedUrl.Path = parsedUrl.Path + endpoint
+		log.Infof("[ENDPOINT-ROUTING] Detected Responses API format, routing to: %s", parsedUrl.String())
+	} else {
+		endpoint = "/chat/completions"
+		parsedUrl.Path = parsedUrl.Path + endpoint
+		log.Infof("[ENDPOINT-ROUTING] Using standard Chat Completions format, routing to: %s", parsedUrl.String())
+	}
+
+	// 记录请求的关键信息
+	log.Infof("[OUTBOUND-REQUEST] Model: %s, BaseURL: %s, Endpoint: %s, FullURL: %s, RawAPIFormat: %s",
+		request.Model, baseUrl, endpoint, parsedUrl.String(), request.RawAPIFormat)
+
 	req.URL = parsedUrl
 	req.Method = http.MethodPost
 	return req, nil

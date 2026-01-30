@@ -61,7 +61,14 @@ func (o *MessagesOutbound) TransformRequest(ctx context.Context, request *model.
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
+	// 对于流式请求，需要设置 Accept: text/event-stream 以支持 SSE
+	if request.Stream != nil && *request.Stream {
+		req.Header.Set("Accept", "text/event-stream")
+	} else {
+		req.Header.Set("Accept", "application/json")
+	}
+	// 设置浏览器 User-Agent 以绕过 Cloudflare 等防护
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 
 	return req, nil
 }

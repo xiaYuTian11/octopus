@@ -52,6 +52,7 @@ type relayContext struct {
 	metrics         *RelayMetrics
 
 	usedKey dbmodel.ChannelKey
+	keyTail string // key 尾缀（后4位），用于日志排查，不暴露完整密钥
 
 	// firstTokenTimeOutSec: streaming-only "time to first token" timeout for the selected group/channel.
 	// When >0 and stream doesn't produce any transformed output within this duration, we abort and retry next channel.

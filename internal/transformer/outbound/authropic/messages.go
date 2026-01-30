@@ -53,6 +53,8 @@ func (o *MessageOutbound) TransformRequest(ctx context.Context, request *model.I
 	} else {
 		req.Header.Set("Accept", "application/json")
 	}
+	// 设置浏览器 User-Agent 以绕过 Cloudflare 等防护
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 	req.Header.Set("Anthropic-Version", "2023-06-01")
 	req.Header.Set("X-API-Key", key)
 

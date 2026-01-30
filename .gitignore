@@ -4,3 +4,10 @@ static/out/*
 !static/out/README.md
 .ace-tool/
 .vscode
+.env.local
+octopus.exe
+.dockerignore
+Dockerfile.local
+docker-compose.local.yml
+scripts/deploy-local-9001.ps1
+scripts/deploy-local-build.ps1

@@ -62,6 +62,9 @@ func (i *ResponseInbound) TransformRequest(ctx context.Context, body []byte) (*m
 		return nil, fmt.Errorf("model is required")
 	}
 
+	log.Infof("[INBOUND-RESPONSES] Received Responses API request, Model: %s, Stream: %v",
+		req.Model, req.Stream != nil && *req.Stream)
+
 	return convertToInternalRequest(&req)
 }
 
@@ -966,6 +969,9 @@ func convertToInternalRequest(req *ResponsesRequest) (*model.InternalLLMRequest,
 		RawAPIFormat:        model.APIFormatOpenAIResponse,
 		TransformerMetadata: map[string]string{},
 	}
+
+	log.Infof("[CONVERT-TO-INTERNAL] Set RawAPIFormat to: %s for model: %s",
+		model.APIFormatOpenAIResponse, req.Model)
 
 	// Convert reasoning
 	if req.Reasoning != nil {

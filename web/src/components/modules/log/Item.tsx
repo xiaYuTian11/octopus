@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState, useEffect } from 'react';
-import { Clock, Cpu, Zap, AlertCircle, ArrowDownToLine, ArrowUpFromLine, DollarSign, ArrowRight, Send, MessageSquare, Loader2 } from 'lucide-react';
+import { Clock, Cpu, Zap, AlertCircle, ArrowDownToLine, ArrowUpFromLine, DollarSign, ArrowRight, Send, MessageSquare, Loader2, Link2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { motion, AnimatePresence } from 'motion/react';
 import JsonView from '@uiw/react-json-view';
@@ -283,6 +283,23 @@ export function LogCard({ log }: { log: RelayLog }) {
                                 {t('cost')}: {Number(log.cost).toFixed(6)}
                             </span>
                         </div>
+                        {log.request_url && (
+                            <div className="flex items-center gap-1.5 min-w-0">
+                                <Link2 className="size-3.5 text-blue-500 shrink-0" />
+                                <span
+                                    className="truncate"
+                                    title={`${log.request_method ?? 'GET'} ${log.request_url}`}
+                                >
+                                    {(log.request_method ?? 'GET').toUpperCase()} {log.request_url}
+                                </span>
+                                <CopyIconButton
+                                    text={`${log.request_method ?? 'GET'} ${log.request_url}`}
+                                    className="ml-auto p-1 rounded-md text-muted-foreground/60 hover:text-foreground hover:bg-muted/20 transition-colors"
+                                    copyIconClassName="size-4"
+                                    checkIconClassName="size-4"
+                                />
+                            </div>
+                        )}
                     </div>
                 </MorphingDialogContent>
             </MorphingDialogContainer>

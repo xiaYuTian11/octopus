@@ -20,6 +20,8 @@ export interface RelayLog {
     cost: number;                // 消耗费用
     request_content: string;     // 请求内容
     response_content: string;    // 响应内容
+    request_url?: string;        // 上游请求URL
+    request_method?: string;     // 请求方法
     error: string;                // 错误信息
 }
 

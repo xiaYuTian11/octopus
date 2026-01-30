@@ -44,7 +44,15 @@ func (o *ResponseOutbound) TransformRequest(ctx context.Context, request *model.
 
 	// Set headers
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
+	// 对于流式请求，需要设置 Accept: text/event-stream 以支持 SSE
+	// 同时保留 application/json 以兼容某些返回 JSON 错误的上游
+	if request.Stream != nil && *request.Stream {
+		req.Header.Set("Accept", "text/event-stream, application/json")
+	} else {
+		req.Header.Set("Accept", "application/json")
+	}
+	// 设置浏览器 User-Agent 以绕过 Cloudflare 等防护
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 	req.Header.Set("Authorization", "Bearer "+key)
 
 	// Parse and set URL
@@ -520,22 +528,21 @@ func convertInputFromMessages(msgs []model.Message) ResponsesInput {
 		return ResponsesInput{}
 	}
 
-	// Check for simple single user message
-	nonSystemMsgs := make([]model.Message, 0)
-	for _, msg := range msgs {
-		if msg.Role != "system" && msg.Role != "developer" {
-			nonSystemMsgs = append(nonSystemMsgs, msg)
-		}
-	}
-
-	if len(nonSystemMsgs) == 1 && nonSystemMsgs[0].Content.Content != nil && nonSystemMsgs[0].Role == "user" {
-		return ResponsesInput{Text: nonSystemMsgs[0].Content.Content}
-	}
+	// 检查 input 数组的格式，参考 Java 测试代码
+	// 上游期望的格式是：
+	// {
+	//   "input": [
+	//     {"role": "user", "content": "..."},
+	//     {"role": "assistant", "content": "..."}
+	//   ]
+	// }
+	// 而不是简化的 input: "text" 格式
 
 	var items []ResponsesItem
 	for _, msg := range msgs {
 		switch msg.Role {
 		case "system", "developer":
+			// system message 应该作为 instructions，不是 input 的一部分
 			continue
 		case "user":
 			items = append(items, convertUserMessageToResponses(msg))
@@ -544,6 +551,15 @@ func convertInputFromMessages(msgs []model.Message) ResponsesInput {
 		case "tool":
 			items = append(items, convertToolMessageToResponses(msg))
 		}
+	}
+
+	if len(items) == 0 {
+		return ResponsesInput{}
+	}
+
+	// 如果只有一个 user message，可以返回 Text 格式
+	if len(items) == 1 && items[0].Type == "input_text" && items[0].Text != nil {
+		return ResponsesInput{Text: items[0].Text}
 	}
 
 	return ResponsesInput{Items: items}
